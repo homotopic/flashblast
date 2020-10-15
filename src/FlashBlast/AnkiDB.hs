@@ -1,0 +1,23 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PolyKinds #-}
+module FlashBlast.AnkiDB where
+
+import Polysemy
+import Polysemy.Reader
+import RIO hiding (Reader, asks)
+import UnliftIO.Path.Directory
+import Path
+
+data AnkiDB m a where
+  CopyToCollections :: [Path Rel File] -> AnkiDB m ()
+
+makeSem ''AnkiDB
+
+newtype UserProfile = UserProfile { unUserProfile :: Path Abs Dir }
+
+interpretAnkiDBIO :: (Member (Embed IO) effs,
+                      Member (Reader UserProfile) effs) => Sem (AnkiDB ': effs) a -> Sem effs a
+interpretAnkiDBIO = interpret $ \case
+    CopyToCollections xs -> forM_ xs $ \x -> do
+                               f <- asks unUserProfile
+                               copyFile x (f </> $(mkRelDir "collections.media") </> filename x)

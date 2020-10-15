@@ -1,0 +1,14 @@
+resolver: nightly-2020-09-29
+packages:
+- .
+extra-deps:
+- compact-0.2.0.0
+- polysemy-plugin-0.2.5.1
+- subtitleParser-0.5
+- replace-megaparsec-1.4.3.0
+- path-dhall-instance-0.2.0.0
+- path-utils-0.1.1.0
+- unliftio-path-0.0.2.0
+- polysemy-video-0.1.0.1
+nix:
+  packages: [zlib, libffi, ffmpeg, pkg-config]
