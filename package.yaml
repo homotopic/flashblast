@@ -1,10 +1,11 @@
 name:                flashblast
-version:             0.0.1.0
+version:             0.0.1.1
 git:                 https://gitlab.com/homotopic-tech/flashblast
 license:             MIT
 author:              "Daniel Firth"
 maintainer:          "dan.firth@homotopic.tech"
 copyright:           "2020 Daniel Firth"
+synopsis:            Generate language learning flashcards from video.
 
 extra-source-files:
 - README.md
