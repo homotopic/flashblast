@@ -1,6 +1,6 @@
 name:                flashblast
 version:             0.0.1.0
-git:                 https://gitlab.com/flashblast
+git:                 https://gitlab.com/homotopic-tech/flashblast
 license:             MIT
 author:              "Daniel Firth"
 maintainer:          "dan.firth@homotopic.tech"

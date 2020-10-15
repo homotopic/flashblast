@@ -1,19 +1,21 @@
-# danki - Command line application for creating anki flashcards.
+# flashblast
 
-Danki is a command line application for creating anki flashcards from a dhall config.
+Flashblast is a command line application for creating anki flashcards from a dhall config.
 
-This is in early stages and not very sophisticated, but you can try it out using the [sample decks](https://gitlab.com/homotopic-tech/danki-sample-decks) to get working output.
+This is in early stages and has some rough edges, but you can try it out using
+the [sample decks](https://gitlab.com/homotopic-tech/flashblast-sample-decks) to get
+working output.
 
-# Install
+## Install
 
 ```
-stack install danki
+stack install flashblast
 ```
 
-# Run
+## Run
 
 cd to the sample decks repository and run
 
 ```
-danki
+flashblast
 ```
