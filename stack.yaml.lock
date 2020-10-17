@@ -54,12 +54,12 @@ packages:
   original:
     hackage: unliftio-path-0.0.2.0
 - completed:
-    hackage: polysemy-video-0.1.0.1@sha256:9e7ba38a6839d60d9b13f9dfe4fe83b32b947f1c7c3c645eed9f3f95b2e10efb,991
+    hackage: polysemy-video-0.1.1.0@sha256:40e77abb8e85aabdeb265d4a1b1a2c8256b0dcba825d8aa4db52737fecb9f47c,991
     pantry-tree:
-      size: 272
-      sha256: 24b13d6347bbdd7de55c54be2b8d17285b6359b97d7a9a3397a3c96e1404b4c1
+      size: 273
+      sha256: 99b3dba1a8c5266485514c7ac97125ff01614923752581ad8305ad1259f00f51
   original:
-    hackage: polysemy-video-0.1.0.1
+    hackage: polysemy-video-0.1.1.0
 snapshots:
 - completed:
     size: 533430

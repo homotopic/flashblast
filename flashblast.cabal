@@ -44,11 +44,12 @@ library
     , path-dhall-instance
     , path-utils
     , polysemy
-    , polysemy-video
+    , polysemy-video >=0.1.1.0
     , replace-megaparsec
     , rio
     , semialign
     , subtitleParser
+    , temporary
     , these
     , turtle
     , unliftio-path
@@ -76,11 +77,12 @@ executable flashblast
     , path-dhall-instance
     , path-utils
     , polysemy
-    , polysemy-video
+    , polysemy-video >=0.1.1.0
     , replace-megaparsec
     , rio
     , semialign
     , subtitleParser
+    , temporary
     , these
     , turtle
     , unliftio-path

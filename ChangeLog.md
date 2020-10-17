@@ -1,5 +1,9 @@
 # Changelog for flashblast
 
+## (v0.0.3.0)
+
+* Add crude logic for not doing things twice. You will need to delete things in out/ if you want it to rerun.
+
 ## (v0.0.2.0)
 
 * Add `,` and `-` as valid characters for a cloze.

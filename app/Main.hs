@@ -25,6 +25,9 @@ import qualified Turtle               as S
 import           FlashBlast.AnkiDB
 import           FlashBlast.ClozeParse
 import           FlashBlast.Conventions
+import qualified UnliftIO.Path.Directory as U
+import qualified System.IO.Temp as U
+
 
 data MultiClozeSpec = MultiClozeSpec {
   phrases :: [Text]
@@ -73,6 +76,25 @@ fromTime (SR.Time h m s f) = Time h m s f
 fromRange :: SR.Range -> Range
 fromRange (SR.Range f t) = Range (fromTime f) (fromTime t)
 
+data FBFileSystem m a where
+  CreateTempDirectory :: FBFileSystem m (Path Abs Dir)
+  CreateDirectory :: Path b Dir -> FBFileSystem m ()
+  RemoveDirectory :: Path b Dir -> FBFileSystem m ()
+  DoesFileExist :: Path b File -> FBFileSystem m Bool
+  CopyFile :: Path b File -> Path b' File -> FBFileSystem m ()
+
+makeSem ''FBFileSystem
+
+interpretFBFileSystem :: Member (Embed IO) effs => Sem (FBFileSystem ': effs) a -> Sem effs a
+interpretFBFileSystem = interpret \case
+  CreateTempDirectory -> do
+    x <- embed $ U.getCanonicalTemporaryDirectory
+    embed $ U.createTempDirectory x "" >>= parseAbsDir
+  CreateDirectory x -> U.createDirectoryIfMissing True x
+  RemoveDirectory x   -> U.removeDirectoryRecursive x
+  DoesFileExist x     -> U.doesFileExist x
+  CopyFile x y -> U.copyFile x y
+
 data YouTubeDL m a where
   YouTubeDL' :: Text -> Path Rel File -> Text -> YouTubeDL m ()
 
@@ -82,7 +104,7 @@ interpretYouTubeDL :: Member (Embed IO) effs => Sem (YouTubeDL ': effs) a -> Sem
 interpretYouTubeDL = interpret \case
   YouTubeDL' x k f -> S.sh $ S.inproc "youtube-dl" [x, "-o", toFilePathText k, "-f", f] mempty
 
-genExcerpts :: Members '[Error SomeException, YouTubeDL, ClipProcess, Reader ExportDirs] m => Path Rel Dir -> ExcerptSpec -> Sem m [RExcerptNote]
+genExcerpts :: Members '[Error SomeException, FBFileSystem, YouTubeDL, ClipProcess, Reader ExportDirs] m => Path Rel Dir -> ExcerptSpec -> Sem m [RExcerptNote]
 genExcerpts dir (ExcerptSpec {..}) = do
   t <- case source of
     YouTubeDL (YDLInfo x y f) -> do
@@ -94,10 +116,22 @@ genExcerpts dir (ExcerptSpec {..}) = do
   cs <- mapM (parseRelFile . T.unpack . clipf . T.pack . show . SR.index) s'
   es <- mapM (parseRelFile . T.unpack . audiof . T.pack . show . SR.index) s'
   fs <- mapM (parseRelFile . T.unpack . framef . T.pack . show . SR.index) s'
-  extractClips t $ zip (fromRange . SR.range <$> s') (clips </$> cs)
-  extractAudio t $ zip (fromRange . SR.range <$> s') (audio </$> es)
+  cs' <- filterM (fmap not . doesFileExist . (clips </>)) cs
+  es' <- filterM (fmap not . doesFileExist . (audio </>)) es
+  h <- createTempDirectory
+  createDirectory clips
+  createDirectory audio
+  createDirectory images
+  when (not . null $ cs') $ do
+    extractClips t $ zip (fromRange . SR.range <$> s') (h </$> cs')
+    forM_ cs' $ \x -> copyFile (h </> x) (clips </> x)
+  when (not . null $ es') $ do
+    extractAudio t $ zip (fromRange . SR.range <$> s') (h </$> es)
+    forM_ es' $ \x -> copyFile (h </> x) (audio </> x)
+  removeDirectory h
   forM (zip4 s' cs es fs) $ \(l, c, e, f) -> do
-    extractFrames (clips </> c) $ [(Time 0 0 0 0, images </> f)]
+    whenM (fmap not . doesFileExist $ images </> f) $
+      extractFrames (clips </> c) $ [(Time 0 0 0 0, images </> f)]
     return $ val @"front" (fst . genClozePhrase . SR.dialog $ l)
           :& val @"extra" f
           :& val @"back"  e
@@ -114,7 +148,7 @@ instance Member (Error SomeException) r => MonadThrow (Sem r) where
 runExcerptSpecIO :: ResourceDirs -> ExportDirs -> [ExcerptSpec] -> Path Rel File -> IO ()
 runExcerptSpecIO (ResourceDirs{..}) x xs out = do
   zs <- sequenceA <$> forM xs \k -> do
-    runM . runError . runReader x . interpretYouTubeDL . interpretFFMpegCli $ genExcerpts video k
+    runM . runError . runReader x . interpretYouTubeDL . interpretFFMpegCli . interpretFBFileSystem $ genExcerpts video k
   case zs of
     Right a -> do
       S.mktree . S.decodeString . toFilePath $ (notes x)

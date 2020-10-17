@@ -68,10 +68,11 @@ dependencies:
 - path-dhall-instance
 - path-utils
 - polysemy
-- polysemy-video
+- polysemy-video >= 0.1.1.0
 - rio
 - semialign
 - subtitleParser
+- temporary
 - these
 - turtle
 - unliftio-path
