@@ -8,7 +8,7 @@ import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
 bracevar :: ParsecT Void Text m Text
-bracevar = between (string "{{") (string "}}") (T.pack <$> many (alphaNumChar <|> spaceChar <|> char '\''))
+bracevar = between (string "{{") (string "}}") (T.pack <$> many (alphaNumChar <|> spaceChar <|> char '\'' <|> char '-' <|> char ','))
 
 addClozeNumbers :: Text -> State Int Text
 addClozeNumbers x = do
