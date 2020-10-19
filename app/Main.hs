@@ -151,7 +151,6 @@ getForvo l t = do
 
 runMultiClozeSpecIO :: Maybe ForvoSpec -> ResourceDirs -> ExportDirs -> [MultiClozeSpec] -> (Text -> Path Rel File) -> Path Rel File -> IO ()
 runMultiClozeSpecIO s r@ResourceDirs{..} x xs f' out = do
-  traceShowM $ "flsdsad"
   zs <- forM xs \(MultiClozeSpec p is) -> do
     forM p \a -> do
                   let (bs, cs) = genClozePhrase a
