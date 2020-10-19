@@ -1,11 +1,11 @@
 module FlashBlast.ClozeParse where
 
-import RIO hiding (many)
-import RIO.State
-import qualified RIO.Text as T
-import Replace.Megaparsec
-import Text.Megaparsec hiding (State)
-import Text.Megaparsec.Char
+import           Replace.Megaparsec
+import           RIO                  hiding (many)
+import           RIO.State
+import qualified RIO.Text             as T
+import           Text.Megaparsec      hiding (State)
+import           Text.Megaparsec.Char
 
 bracevar :: ParsecT Void Text m Text
 bracevar = between (string "{{") (string "}}") (T.pack <$> many (alphaNumChar <|> spaceChar <|> char '\'' <|> char '-' <|> char ','))

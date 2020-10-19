@@ -1,12 +1,12 @@
+{-# LANGUAGE PolyKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE PolyKinds #-}
 module FlashBlast.AnkiDB where
 
-import Polysemy
-import Polysemy.Reader
-import RIO hiding (Reader, asks)
-import UnliftIO.Path.Directory
-import Path
+import           Path
+import           Polysemy
+import           Polysemy.Reader
+import           RIO                     hiding (Reader, asks)
+import           UnliftIO.Path.Directory
 
 data AnkiDB m a where
   CopyToCollections :: [Path Rel File] -> AnkiDB m ()

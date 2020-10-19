@@ -2,12 +2,12 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module FlashBlast.Config where
 
-import qualified Dhall                as D
-import           Path
-import           Path.Dhall           ()
-import           RIO
+import qualified Dhall                  as D
 import           FlashBlast.Conventions
-import FlashBlast.ForvoClient
+import           FlashBlast.ForvoClient
+import           Path
+import           Path.Dhall             ()
+import           RIO
 
 
 data MultiClozeSpec = MultiClozeSpec {
@@ -18,8 +18,8 @@ data MultiClozeSpec = MultiClozeSpec {
 instance D.FromDhall MultiClozeSpec
 
 data YDLInfo = YDLInfo {
-  url :: Text
-, out :: Path Rel File
+  url    :: Text
+, out    :: Path Rel File
 , format :: Text
 } deriving (Eq, Generic, Show)
 
@@ -40,7 +40,7 @@ instance D.FromDhall VideoSource
 
 data ExcerptSpec = ExcerptSpec {
   source :: VideoSource
-, subs  :: Text
+, subs   :: Text
 , clipf  :: Text -> Path Rel File
 , audiof :: Text -> Path Rel File
 , framef :: Text -> Path Rel File
@@ -67,7 +67,7 @@ data Deck = Deck {
 
 data Part = Part {
   outfile :: Path Rel File
-, spec   :: Spec
+, spec    :: Spec
 } deriving Generic
 
 instance D.FromDhall Deck
@@ -93,9 +93,9 @@ data ForvoSpec = ForvoSpec {
 instance D.FromDhall ForvoSpec
 
 data PronunciationSpec = PronunciationSpec {
- audiof :: Text -> Path Rel File
+ audiof  :: Text -> Path Rel File
 , multis :: [MultiClozeSpec]
-, forvo :: Maybe ForvoSpec
+, forvo  :: Maybe ForvoSpec
 } deriving Generic
 
 instance D.FromDhall PronunciationSpec

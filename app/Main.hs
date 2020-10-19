@@ -3,40 +3,40 @@
 {-# LANGUAGE UndecidableInstances  #-}
 
 import           Composite.Record
-import qualified Data.Attoparsec.Text as A
-import Data.Aeson
-import qualified Dhall                as D
+import           Data.Aeson
+import qualified Data.Attoparsec.Text     as A
+import qualified Dhall                    as D
+import           Network.HTTP.Simple
 import           Path
-import           Path.Dhall           ()
-import Network.HTTP.Simple
+import           Path.Dhall               ()
 import           Path.Utils
 import           Polysemy
-import Polysemy.Trace
-import           Polysemy.Error       as P
-import Polysemy.Input
+import           Polysemy.Error           as P
+import           Polysemy.Input
+import           Polysemy.KVStore
+import           Polysemy.Trace
 import           Polysemy.Video
-import Polysemy.KVStore
 
-import           RIO                  hiding (Reader, ask, asks, many, trace,
-                                       runReader, log)
-import           RIO.List
-import           RIO.List.Partial
-import qualified RIO.Map              as Map
-import Polysemy.State
-import qualified RIO.Text             as T
-import qualified Text.Subtitles.SRT   as SR
-import qualified Turtle               as S
+import           Colog.Polysemy
 import           FlashBlast.AnkiDB
 import           FlashBlast.ClozeParse
+import           FlashBlast.Config
 import           FlashBlast.Conventions
-import FlashBlast.ForvoClient
-import FlashBlast.YouTubeDL
-import qualified UnliftIO.Path.Directory as U
-import qualified System.IO.Temp as U
-import FlashBlast.Config
-import qualified RIO.ByteString as BS
-import FlashBlast.JSONFileStore
-import Colog.Polysemy
+import           FlashBlast.ForvoClient
+import           FlashBlast.JSONFileStore
+import           FlashBlast.YouTubeDL
+import           Polysemy.State
+import           RIO                      hiding (Reader, ask, asks, log, many,
+                                           runReader, trace)
+import qualified RIO.ByteString           as BS
+import           RIO.List
+import           RIO.List.Partial
+import qualified RIO.Map                  as Map
+import qualified RIO.Text                 as T
+import qualified System.IO.Temp           as U
+import qualified Text.Subtitles.SRT       as SR
+import qualified Turtle                   as S
+import qualified UnliftIO.Path.Directory  as U
 
 
 fromTime :: SR.Time -> Time
@@ -127,7 +127,7 @@ downloadMP3For l t = do
   where
     p :: Members '[ForvoClient, Trace] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
     p x = case items x of
-      [] -> return Nothing
+      []      -> return Nothing
       (x':xs) -> Just <$> mP3For x'
 
 getForvo :: Members '[Trace, FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()

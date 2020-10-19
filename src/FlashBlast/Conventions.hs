@@ -2,20 +2,20 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 module FlashBlast.Conventions where
 
-import Dhall hiding (maybe)
-import Data.Align
-import Composite.Record
-import Composite.TH
-import Formatting
-import qualified  RIO.Text as T
-import qualified RIO.Text.Lazy as LT
+import           Composite.Record
+import           Composite.TH
+import           Data.Align
+import           Dhall            hiding (maybe)
+import           Formatting
+import           Lucid
+import           Path
+import           Path.Dhall       ()
+import           Path.Utils
+import           RIO
+import           RIO.List.Partial
+import qualified RIO.Text         as T
+import qualified RIO.Text.Lazy    as LT
 import qualified RIO.Text.Partial as T
-import RIO
-import RIO.List.Partial
-import Path
-import Path.Dhall()
-import Path.Utils
-import Lucid
 
 data VF = Empty | Raw Text | Images [Path Rel File] | Audio (Path Rel File)
   deriving (Eq, Show ,Generic)
