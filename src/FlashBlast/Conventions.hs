@@ -3,6 +3,7 @@
 module FlashBlast.Conventions where
 
 import Dhall hiding (maybe)
+import Data.Align
 import Composite.Record
 import Composite.TH
 import Formatting
@@ -10,6 +11,7 @@ import qualified  RIO.Text as T
 import qualified RIO.Text.Lazy as LT
 import qualified RIO.Text.Partial as T
 import RIO
+import RIO.List.Partial
 import Path
 import Path.Dhall()
 import Path.Utils
@@ -90,3 +92,30 @@ renderVF Empty = ""
 renderVF (Raw x) = x
 renderVF (Images x) = T.intercalate "\n" $ LT.toStrict . renderText . ungroundedImage <$> x
 renderVF (Audio x) = soundEmbed x
+
+genForvos :: Text -> [Path Rel File] -> [Path Rel File] -> RForvoNote
+genForvos x zs ys' =
+  let ys = lpadZipWith (\a _ -> if isJust a then a else Nothing) ys' (replicate 16 ())
+      k = ys !! 0 :*: ys !! 1 :*: ys !! 2 :*: ys !! 3 :*: ys !! 4 :*: ys !! 5 :*: ys !! 6 :*: ys !! 7 :*: ys !! 8 :*: ys !! 9 :*: ys !! 10 :*: ys !! 11 :*: ys !! 12 :*: ys !! 13 :*: ys !! 14 :*: ys !! 15 :*: RNil
+  in x :*: zs :*: k
+
+class RenderNote f where
+  renderNote :: f -> Text
+
+data SomeNote = forall e. RenderNote e => SomeNote e
+
+instance RenderNote RBasicReversedNoteVF where
+  renderNote = renderBasicReversedNoteVF
+
+instance RenderNote RMinimalNoteVF where
+  renderNote = renderMinimalNoteVF
+
+instance RenderNote RExcerptNote where
+  renderNote = renderExcerptNote
+
+instance RenderNote RForvoNote where
+  renderNote = renderForvoNote
+
+instance RenderNote SomeNote where
+  renderNote (SomeNote e) = renderNote e
+

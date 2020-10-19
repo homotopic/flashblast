@@ -13,11 +13,9 @@ import           Path.Utils
 import           Polysemy
 import           Polysemy.Error       as P
 import Polysemy.Input
-import           Polysemy.Reader
 import           Polysemy.Video
 import Polysemy.KVStore
 
-import           Data.Align
 import           RIO                  hiding (Reader, ask, asks, many,
                                        runReader)
 import           RIO.List
@@ -33,7 +31,6 @@ import FlashBlast.ForvoClient
 import FlashBlast.YouTubeDL
 import qualified UnliftIO.Path.Directory as U
 import qualified System.IO.Temp as U
-import RIO.Time
 import FlashBlast.Config
 import qualified RIO.ByteString as BS
 import FlashBlast.JSONFileStore
@@ -66,14 +63,21 @@ interpretFBFileSystem = interpret \case
   CopyFile x y -> U.copyFile x y
   WriteFileBS x y -> BS.writeFile (toFilePath x) y
 
-genExcerpts :: Members '[Error SubtitleParseException, FBFileSystem, YouTubeDL, ClipProcess, Reader ExportDirs] m => Path Rel Dir -> ExcerptSpec -> Sem m [RExcerptNote]
-genExcerpts dir (ExcerptSpec {..}) = do
+runExcerptSpecIO :: Members '[Error SubtitleParseException
+                       , FBFileSystem
+                       , Input ExportDirs
+                       , Input ResourceDirs
+                       , YouTubeDL
+                       , ClipProcess] m
+                       => ExcerptSpec -> Sem m [RExcerptNote]
+runExcerptSpecIO (ExcerptSpec {..}) = do
+  ResourceDirs{..} <- input @ResourceDirs
+  ExportDirs{..} <- input @ExportDirs
   t <- case source of
     YouTubeDL (YDLInfo x y f) -> do
-      youTubeDL' x (dir </> y) f
-      return (dir </> y)
-    LocalVideo x -> return (dir </> x)
-  ExportDirs{..} <- ask @ExportDirs
+      youTubeDL' x (video </> y) f
+      return (video </> y)
+    LocalVideo x -> return (video </> x)
   s' <- either (throw . SubtitleParseException) return $ A.parseOnly SR.parseSRT subs
   let cs = map (clipf  . T.pack . show . SR.index) s'
   let es = map (audiof . T.pack . show . SR.index) s'
@@ -104,16 +108,6 @@ newtype SubtitleParseException = SubtitleParseException String
 
 instance Exception SubtitleParseException
 
-runExcerptSpecIO :: ResourceDirs -> ExportDirs -> [ExcerptSpec] -> Path Rel File -> IO ()
-runExcerptSpecIO (ResourceDirs{..}) x xs out = do
-  zs <- sequenceA <$> forM xs \k -> do
-    runM . runError @SubtitleParseException. runReader x . interpretYouTubeDL . interpretFFMpegCli . interpretFBFileSystem $ genExcerpts video k
-  case zs of
-    Right a -> do
-      S.mktree . S.decodeString . toFilePath $ (notes x)
-      writeFileUtf8 (toFilePath (notes x </> out)) $ T.intercalate "\n" $ renderExcerptNote <$> join a
-    Left s -> throwIO s
-
 type FSPKVStore = KVStore (Locale, Text) ForvoStandardPronunciationResponseBody
 
 downloadMP3For :: Members [FSPKVStore, ForvoClient] r => Locale -> Text -> Sem r (Maybe ByteString)
@@ -131,55 +125,64 @@ downloadMP3For l t = do
       [] -> return Nothing
       (x':xs) -> Just <$> mP3For x'
 
-genForvos :: (MonadThrow m, MonadIO m) => Text -> [Path Rel File] -> [Path Rel File] -> m RForvoNote
-genForvos x zs ys' = do
-  let ys = lpadZipWith (\a _ -> if isJust a then a else Nothing) ys' (replicate 16 ())
-  let k = ys !! 0 :*: ys !! 1 :*: ys !! 2 :*: ys !! 3 :*: ys !! 4 :*: ys !! 5 :*: ys !! 6 :*: ys !! 7 :*: ys !! 8 :*: ys !! 9 :*: ys !! 10 :*: ys !! 11 :*: ys !! 12 :*: ys !! 13 :*: ys !! 14 :*: ys !! 15 :*: RNil
-  return $ x :*: zs :*: k
-
-getForvo :: Members '[FBFileSystem, Input ResourceDirs, Input (Text -> Path Rel File), FSPKVStore, ForvoClient] r => Locale -> Text -> Sem r ()
-getForvo l t = do
-  ResourceDirs{..} <- input @ResourceDirs
-  f <- input @(Text -> Path Rel File)
-  whenM (fmap not . doesFileExist $ (audio </> f t)) $ do
+getForvo :: Members '[FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
+getForvo l t f = do
+  unlessM (doesFileExist f) $ do
     x <- downloadMP3For l t
     case x of
-      Just x' -> do
-        f <- input @(Text -> Path Rel File)
-        writeFileBS (audio </> f t) x'
+      Just x' -> writeFileBS f x'
       Nothing -> return ()
 
-runMultiClozeSpecIO :: Maybe ForvoSpec -> ResourceDirs -> ExportDirs -> [MultiClozeSpec] -> (Text -> Path Rel File) -> Path Rel File -> IO ()
-runMultiClozeSpecIO s r@ResourceDirs{..} x xs f' out = do
-  zs <- forM xs \(MultiClozeSpec p is) -> do
+runMultiClozeSpecIO :: Members '[Embed IO, Error SomeException, FBFileSystem, Error JSONException, FSPKVStore, Input (Maybe ForvoSpec)] m => (Text -> Path Rel File) -> MultiClozeSpec -> Sem m [RForvoNote]
+runMultiClozeSpecIO f (MultiClozeSpec p is) =
     forM p \a -> do
-                  let (bs, cs) = genClozePhrase a
-                  forM s $ \(ForvoSpec l api) ->
-                    forM cs $ \c' -> do
-                      runM . runInputConst @JSONFileStore (JSONFileStore $(mkRelFile ".forvocache")) . runError @JSONParseException . runKVStoreAsJSONFileStore . runError @SomeException . runError @JSONException . runInputConst @ForvoAPIKey api . interpretForvoClient . runInputConst @ResourceDirs r . runInputConst @(Text -> Path Rel File) f' . interpretFBFileSystem $ getForvo l c'
-                  genForvos bs is (map f' cs)
-  S.mktree . S.decodeString . toFilePath $ (notes x)
-  writeFileUtf8 (toFilePath (notes x </> out)) $ (T.intercalate "\n" $ renderForvoNote <$> join zs)
+      let (bs, cs) = genClozePhrase a
+      s <- input @(Maybe ForvoSpec)
+      forM s $ \(ForvoSpec l api) ->
+        forM cs $ \t -> runInputConst @ForvoAPIKey api . interpretForvoClient $ getForvo l t (f t)
+      return $ genForvos bs is (map f cs)
 
-runMinimalReversedIO :: ResourceDirs -> ExportDirs -> [MinimalReversedSpec] -> Path Rel File -> IO ()
-runMinimalReversedIO _ x xs out = do
-  zs <- forM xs \MinimalReversedSpec{..} -> return $ val @"from" from :& val @"to" to :& RNil
-  S.mktree . S.decodeString . toFilePath $ notes x
-  writeFileUtf8 (toFilePath (notes x </> out)) $ (T.intercalate "\n" $ renderMinimalNoteVF <$> zs)
+runPronunciationSpecIO :: Members '[FBFileSystem, FSPKVStore, Error JSONException, Error SomeException, Embed IO] m => PronunciationSpec -> Sem m [RForvoNote]
+runPronunciationSpecIO (PronunciationSpec f ms a) = runInputConst @(Maybe ForvoSpec) a $ do
+                                                           zs <- forM ms $ runMultiClozeSpecIO f
+                                                           return $ join zs
 
-runBasicReversedIO :: ResourceDirs -> ExportDirs -> [BasicReversedSpec] -> Path Rel File -> IO ()
-runBasicReversedIO ResourceDirs{..} x xs out = do
-  zs <- forM xs \BasicReversedSpec{..} -> return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
-  S.mktree . S.decodeString . toFilePath $ notes x
-  writeFileUtf8 (toFilePath (notes x </> out)) $ T.intercalate "\n" (renderBasicReversedNoteVF <$> zs)
+runMinimalReversed :: MinimalReversedSpec -> Sem m RMinimalNoteVF
+runMinimalReversed MinimalReversedSpec{..} = return $ val @"from" from :& val @"to" to :& RNil
+
+runBasicReversed :: BasicReversedSpec -> Sem m RBasicReversedNoteVF
+runBasicReversed BasicReversedSpec{..} = return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
+
+runSomeSpec :: Members [Embed IO, Error JSONException, FBFileSystem, ClipProcess, Input ResourceDirs, Error SubtitleParseException, Error SomeException, Input ExportDirs, YouTubeDL, FSPKVStore] m => Spec -> Sem m [SomeNote]
+runSomeSpec p = case p of
+      Excerpt xs         -> fmap (fmap SomeNote) $ (join <$> mapM runExcerptSpecIO xs)
+      Pronunciation xs   -> fmap (fmap SomeNote) . runPronunciationSpecIO $ xs
+      MinimalReversed xs -> mapM (fmap SomeNote . runMinimalReversed) xs
+      BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs
 
 runMakeDeck :: Deck -> IO ()
 runMakeDeck Deck{..} = do
-  forM_ parts \(Part a p) -> case p of
-    Excerpt x -> runExcerptSpecIO resourceDirs exportDirs x a
-    Pronunciation (PronunciationSpec f x l) -> runMultiClozeSpecIO l resourceDirs exportDirs x f a
-    MinimalReversed x -> runMinimalReversedIO resourceDirs exportDirs x a
-    BasicReversed x -> runBasicReversedIO resourceDirs exportDirs x a
+  let ResourceDirs{..} = resourceDirs
+  let ExportDirs{..} = exportDirs
+  forM_ parts \(Part out p) -> do
+    z <- runM
+       . runError @SomeException
+       . mapError @JSONParseException SomeException
+       . mapError @JSONException SomeException
+       . mapError @SubtitleParseException SomeException
+       . runInputConst @ResourceDirs resourceDirs
+       . runInputConst @ExportDirs exportDirs
+       . interpretFBFileSystem
+       . interpretYouTubeDL
+       . runInputConst (JSONFileStore $(mkRelFile ".forvocache"))
+       . runKVStoreAsJSONFileStore
+       . interpretFFMpegCli
+       $ runSomeSpec p
+    case z of
+      Left x -> throwIO x
+      Right x -> do
+        S.mktree . S.decodeString . toFilePath $ notes
+        writeFileUtf8 (toFilePath (notes </> out)) $ T.intercalate "\n" $ renderNote <$> x
 
 main :: IO ()
 main = do
