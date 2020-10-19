@@ -58,7 +58,7 @@ makeSem ''FBFileSystem
 interpretFBFileSystem :: Member (Embed IO) effs => Sem (FBFileSystem ': effs) a -> Sem effs a
 interpretFBFileSystem = interpret \case
   CreateTempDirectory -> do
-    x <- embed $ U.getCanonicalTemporaryDirectory
+    x <- embed U.getCanonicalTemporaryDirectory
     embed $ U.createTempDirectory x "" >>= parseAbsDir
   CreateDirectory x -> U.createDirectoryIfMissing True x
   RemoveDirectory x   -> U.removeDirectoryRecursive x
@@ -73,7 +73,7 @@ runExcerptSpecIO :: Members '[Error SubtitleParseException
                        , YouTubeDL
                        , ClipProcess] m
                        => ExcerptSpec -> Sem m [RExcerptNote]
-runExcerptSpecIO (ExcerptSpec {..}) = do
+runExcerptSpecIO ExcerptSpec {..} = do
   ResourceDirs{..} <- input @ResourceDirs
   ExportDirs{..} <- input @ExportDirs
   t <- case source of
@@ -91,16 +91,16 @@ runExcerptSpecIO (ExcerptSpec {..}) = do
   createDirectory clips
   createDirectory audio
   createDirectory images
-  when (not . null $ cs') $ do
+  unless (null cs') $ do
     extractClips t $ zip (fromRange . SR.range <$> s') (h </$> cs')
     forM_ cs' $ \x -> copyFile (h </> x) (clips </> x)
-  when (not . null $ es') $ do
+  unless (null es') $ do
     extractAudio t $ zip (fromRange . SR.range <$> s') (h </$> es)
     forM_ es' $ \x -> copyFile (h </> x) (audio </> x)
   removeDirectory h
   forM (zip4 s' cs es fs) $ \(l, c, e, f) -> do
     whenM (fmap not . doesFileExist $ images </> f) $
-      extractFrames (clips </> c) $ [(Time 0 0 0 0, images </> f)]
+      extractFrames (clips </> c) [(Time 0 0 0 0, images </> f)]
     return $ val @"front" (fst . genClozePhrase . SR.dialog $ l)
           :& val @"extra" f
           :& val @"back"  e
@@ -160,7 +160,7 @@ runMultiClozeSpecIO f (MultiClozeSpec p is) = do
     forM p \a -> do
       let (bs, cs) = genClozePhrase a
       s <- get @(Maybe ForvoSpec)
-      forM s $ \(ForvoSpec l api) ->
+      forM_ s $ \(ForvoSpec l api) ->
         forM cs $ \t -> do
           z <- P.try @JSONException $
             runInputConst @ForvoAPIKey api . interpretForvoClient $ getForvo l t (audio </> f t)
@@ -202,7 +202,7 @@ runSomeSpec :: Members [ RemoteHttpRequest
                        , YouTubeDL
                        , FSPKVStore] m => Spec -> Sem m [SomeNote]
 runSomeSpec p = case p of
-      Excerpt xs         -> fmap (fmap SomeNote) $ (join <$> mapM runExcerptSpecIO xs)
+      Excerpt xs         -> fmap SomeNote <$> (join <$> mapM runExcerptSpecIO xs)
       Pronunciation xs   -> fmap (fmap SomeNote) . runPronunciationSpecIO $ xs
       MinimalReversed xs -> mapM (fmap SomeNote . runMinimalReversed) xs
       BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs

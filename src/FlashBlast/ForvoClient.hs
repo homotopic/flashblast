@@ -9,13 +9,13 @@ import RIO hiding (fromException)
 import qualified RIO.Text as T
 import Network.HTTP.Simple
 
-data Locale = Locale Text
+newtype Locale = Locale Text
   deriving (Eq, Show, Generic, Ord)
 
 instance ToJSON Locale
 instance FromJSON Locale
 
-data ForvoStandardPronunciationResponseBody = ForvoStandardPronunciationResponseBody {
+newtype ForvoStandardPronunciationResponseBody = ForvoStandardPronunciationResponseBody {
   items :: [ForvoPronunciationJson]
 } deriving (Eq, Show, Generic)
 
@@ -69,14 +69,14 @@ makeSem ''RemoteHttpRequest
 interpretRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error SomeException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
 interpretRemoteHttpRequest = interpret \case
   RequestJSON x -> do
-    let k = parseRequest $ T.unpack $ x
+    let k = parseRequest $ T.unpack x
     case k of
       Left e -> throw @SomeException e
       Right x -> do
         j <- fromException @JSONException $ httpJSON x
         return $ getResponseBody j
   RequestBS x -> do
-    let k = parseRequest $ T.unpack $ x
+    let k = parseRequest $ T.unpack x
     case k of
       Left e -> throw @SomeException e
       Right x -> do

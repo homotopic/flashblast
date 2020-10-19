@@ -1,5 +1,4 @@
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE TemplateHaskell       #-}
 module FlashBlast.Config where
 
 import qualified Dhall                  as D
