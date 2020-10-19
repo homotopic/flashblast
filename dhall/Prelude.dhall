@@ -59,4 +59,28 @@ let defaultDeckLayout =
           }
         }
 
-in  { MultiClozeSpec, VideoSource, ExcerptSpec, VariField, MinimalReversedSpec, BasicReversedSpec, Forvo, Spec, Part, defaultDeckLayout }
+let defaultYouTubeDLSpec =
+      λ(t : Text) →
+      λ(u : Text) →
+      λ(s : Text) →
+        { source =
+            VideoSource.YouTubeDL
+              { url = u, out = "${t}.mp4", format = "mp4" }
+        , subs = s
+        , clipf = λ(n : Text) → "${t}-${n}.mkv"
+        , audiof = λ(n : Text) → "${t}-${n}.mp3"
+        , framef = λ(n : Text) → "${t}-${n}.bmp"
+        }
+
+in  { MultiClozeSpec
+    , VideoSource
+    , ExcerptSpec
+    , VariField
+    , MinimalReversedSpec
+    , BasicReversedSpec
+    , Forvo
+    , Spec
+    , Part
+    , defaultDeckLayout
+    , defaultYouTubeDLSpec
+    }
