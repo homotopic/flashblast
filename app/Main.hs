@@ -41,6 +41,16 @@ fromTime (SR.Time h m s f) = Time h m s f
 fromRange :: SR.Range -> Range
 fromRange (SR.Range f t) = Range (fromTime f) (fromTime t)
 
+interpretVideoSource :: Members '[Input ResourceDirs, YouTubeDL] m => VideoSource -> Sem m (Path Rel File)
+interpretVideoSource = \case
+  YouTubeDL (YDLInfo x y f) -> do
+    ResourceDirs{..} <- input @ResourceDirs
+    youTubeDL' x (video </> y) f
+    return (video </> y)
+  LocalVideo x -> do
+    ResourceDirs{..} <- input @ResourceDirs
+    return (video </> x)
+
 runExcerptSpecIO :: Members '[Error SubtitleParseException
                        , FBFileSystem
                        , Input ExportDirs
@@ -51,11 +61,7 @@ runExcerptSpecIO :: Members '[Error SubtitleParseException
 runExcerptSpecIO ExcerptSpec {..} = do
   ResourceDirs{..} <- input @ResourceDirs
   ExportDirs{..} <- input @ExportDirs
-  t <- case source of
-    YouTubeDL (YDLInfo x y f) -> do
-      youTubeDL' x (video </> y) f
-      return (video </> y)
-    LocalVideo x -> return (video </> x)
+  t <- interpretVideoSource source
   s' <- either (throw . SubtitleParseException) return $ A.parseOnly SR.parseSRT subs
   let cs = map (clipf  . T.pack . show . SR.index) s'
   let es = map (audiof . T.pack . show . SR.index) s'
