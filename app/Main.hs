@@ -3,7 +3,6 @@
 {-# LANGUAGE UndecidableInstances  #-}
 
 import           Composite.Record
-import           Data.Aeson
 import qualified Data.Attoparsec.Text     as A
 import qualified Dhall                    as D
 import           Network.HTTP.Simple
@@ -21,6 +20,7 @@ import           Colog.Polysemy
 import           FlashBlast.AnkiDB
 import           FlashBlast.ClozeParse
 import           FlashBlast.Config
+import           FlashBlast.FBFileSystem
 import           FlashBlast.Conventions
 import           FlashBlast.ForvoClient
 import           FlashBlast.JSONFileStore
@@ -28,15 +28,11 @@ import           FlashBlast.YouTubeDL
 import           Polysemy.State
 import           RIO                      hiding (Reader, ask, asks, log, many,
                                            runReader, trace)
-import qualified RIO.ByteString           as BS
 import           RIO.List
-import           RIO.List.Partial
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
-import qualified System.IO.Temp           as U
 import qualified Text.Subtitles.SRT       as SR
 import qualified Turtle                   as S
-import qualified UnliftIO.Path.Directory  as U
 
 
 fromTime :: SR.Time -> Time
@@ -44,27 +40,6 @@ fromTime (SR.Time h m s f) = Time h m s f
 
 fromRange :: SR.Range -> Range
 fromRange (SR.Range f t) = Range (fromTime f) (fromTime t)
-
-data FBFileSystem m a where
-  CreateTempDirectory :: FBFileSystem m (Path Abs Dir)
-  CreateDirectory :: Path b Dir -> FBFileSystem m ()
-  RemoveDirectory :: Path b Dir -> FBFileSystem m ()
-  DoesFileExist :: Path b File -> FBFileSystem m Bool
-  CopyFile :: Path b File -> Path b' File -> FBFileSystem m ()
-  WriteFileBS :: Path b File -> BS.ByteString -> FBFileSystem m ()
-
-makeSem ''FBFileSystem
-
-interpretFBFileSystem :: Member (Embed IO) effs => Sem (FBFileSystem ': effs) a -> Sem effs a
-interpretFBFileSystem = interpret \case
-  CreateTempDirectory -> do
-    x <- embed U.getCanonicalTemporaryDirectory
-    embed $ U.createTempDirectory x "" >>= parseAbsDir
-  CreateDirectory x -> U.createDirectoryIfMissing True x
-  RemoveDirectory x   -> U.removeDirectoryRecursive x
-  DoesFileExist x     -> U.doesFileExist x
-  CopyFile x y -> U.copyFile x y
-  WriteFileBS x y -> BS.writeFile (toFilePath x) y
 
 runExcerptSpecIO :: Members '[Error SubtitleParseException
                        , FBFileSystem
