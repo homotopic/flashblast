@@ -56,11 +56,13 @@ default-extensions:
 - ViewPatterns
 
 dependencies:
+- aeson
 - attoparsec
 - base >= 4.7 && < 5
 - composite-base
 - dhall
 - formatting
+- http-conduit
 - lucid
 - megaparsec
 - replace-megaparsec
@@ -68,7 +70,9 @@ dependencies:
 - path-dhall-instance
 - path-utils
 - polysemy
+- polysemy-plugin
 - polysemy-video >= 0.1.1.0
+- polysemy-zoo
 - rio
 - semialign
 - subtitleParser
@@ -98,4 +102,5 @@ ghc-options:
 - -Wincomplete-record-updates
 - -Wincomplete-uni-patterns
 - -Wredundant-constraints
+- -fplugin=Polysemy.Plugin
 
