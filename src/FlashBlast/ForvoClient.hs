@@ -5,7 +5,7 @@ import Data.Aeson
 import Polysemy
 import Polysemy.Error
 import Polysemy.Input
-import RIO
+import RIO hiding (fromException)
 import qualified RIO.Text as T
 import Network.HTTP.Simple
 
@@ -73,17 +73,17 @@ interpretRemoteHttpRequest = interpret \case
     case k of
       Left e -> throw @SomeException e
       Right x -> do
-        j <- httpJSON x
+        j <- fromException @JSONException $ httpJSON x
         return $ getResponseBody j
   RequestBS x -> do
     let k = parseRequest $ T.unpack $ x
     case k of
       Left e -> throw @SomeException e
       Right x -> do
-        j <- httpBS x
+        j <- fromException @JSONException $ httpBS x
         return $ getResponseBody j
 
-interpretForvoClient :: Members '[RemoteHttpRequest, Input ForvoAPIKey, Error JSONException, Error SomeException] r => Sem (ForvoClient ': r) a -> Sem r a
+interpretForvoClient :: Members '[RemoteHttpRequest, Input ForvoAPIKey] r => Sem (ForvoClient ': r) a -> Sem r a
 interpretForvoClient = interpret \case
   StandardPronunciation (Locale l) t -> do
     ForvoAPIKey f <- input @ForvoAPIKey

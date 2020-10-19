@@ -22,6 +22,7 @@ import           RIO                  hiding (Reader, ask, asks, many, trace,
 import           RIO.List
 import           RIO.List.Partial
 import qualified RIO.Map              as Map
+import Polysemy.State
 import qualified RIO.Text             as T
 import qualified Text.Subtitles.SRT   as SR
 import qualified Turtle               as S
@@ -136,18 +137,25 @@ getForvo l t f = do
       Just x' -> writeFileBS f x'
       Nothing -> return ()
 
-runMultiClozeSpecIO :: Members '[RemoteHttpRequest, Trace, Input ResourceDirs, Error SomeException, FBFileSystem, Error JSONException, FSPKVStore, Input (Maybe ForvoSpec)] m => (Text -> Path Rel File) -> MultiClozeSpec -> Sem m [RForvoNote]
+runMultiClozeSpecIO :: Members '[RemoteHttpRequest, Trace, Input ResourceDirs, Error SomeException, FBFileSystem, Error JSONException, FSPKVStore, State (Maybe ForvoSpec)] m => (Text -> Path Rel File) -> MultiClozeSpec -> Sem m [RForvoNote]
 runMultiClozeSpecIO f (MultiClozeSpec p is) = do
     ResourceDirs{..} <- input @ResourceDirs
     forM p \a -> do
       let (bs, cs) = genClozePhrase a
-      s <- input @(Maybe ForvoSpec)
+      s <- get @(Maybe ForvoSpec)
       forM s $ \(ForvoSpec l api) ->
-        forM cs $ \t -> runInputConst @ForvoAPIKey api . interpretForvoClient $ getForvo l t (audio </> f t)
+        forM cs $ \t -> do
+          z <- P.try @JSONException $
+            runInputConst @ForvoAPIKey api . interpretForvoClient $ getForvo l t (audio </> f t)
+          case z of
+            Left e -> do
+              trace $ "Something went wrong with forvo, skipping forvo for the remainder of run."
+              put @(Maybe ForvoSpec) Nothing
+            Right x -> return ()
       return $ genForvos bs is (map f cs)
 
 runPronunciationSpecIO :: Members '[FBFileSystem, Trace, Input ResourceDirs, FSPKVStore, Error JSONException, Error SomeException, RemoteHttpRequest] m => PronunciationSpec -> Sem m [RForvoNote]
-runPronunciationSpecIO (PronunciationSpec f ms a) = runInputConst @(Maybe ForvoSpec) a $ do
+runPronunciationSpecIO (PronunciationSpec f ms a) = evalState @(Maybe ForvoSpec) a $ do
                                                            zs <- forM ms $ runMultiClozeSpecIO f
                                                            return $ join zs
 
@@ -172,8 +180,8 @@ runMakeDeck Deck{..} = do
     z <- runM
        . traceToIO
        . runError @SomeException
-       . mapError @JSONParseException SomeException
        . mapError @JSONException SomeException
+       . mapError @JSONParseException SomeException
        . mapError @SubtitleParseException SomeException
        . runInputConst @ResourceDirs resourceDirs
        . runInputConst @ExportDirs exportDirs
