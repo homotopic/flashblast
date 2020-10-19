@@ -18,7 +18,7 @@ import           Polysemy.Video
 import Polysemy.KVStore
 
 import           RIO                  hiding (Reader, ask, asks, many, trace,
-                                       runReader)
+                                       runReader, log)
 import           RIO.List
 import           RIO.List.Partial
 import qualified RIO.Map              as Map
@@ -36,6 +36,7 @@ import qualified System.IO.Temp as U
 import FlashBlast.Config
 import qualified RIO.ByteString as BS
 import FlashBlast.JSONFileStore
+import Colog.Polysemy
 
 
 fromTime :: SR.Time -> Time
@@ -131,13 +132,29 @@ downloadMP3For l t = do
 
 getForvo :: Members '[Trace, FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
-  unlessM (doesFileExist f) $ do
-    x <- downloadMP3For l t
-    case x of
-      Just x' -> writeFileBS f x'
-      Nothing -> return ()
+  z <- doesFileExist f
+  case z of
+    True  -> trace $ show f <> " already exists in filesystem."
+    False -> do
+      trace $ show f <> " not found in filesystem."
+      x <- downloadMP3For l t
+      case x of
+        Just x' -> do
+          createDirectory (parent f)
+          writeFileBS f x'
+        Nothing -> return ()
 
-runMultiClozeSpecIO :: Members '[RemoteHttpRequest, Trace, Input ResourceDirs, Error SomeException, FBFileSystem, Error JSONException, FSPKVStore, State (Maybe ForvoSpec)] m => (Text -> Path Rel File) -> MultiClozeSpec -> Sem m [RForvoNote]
+runMultiClozeSpecIO :: Members '[ RemoteHttpRequest
+                                , Trace
+                                , Input ResourceDirs
+                                , Error SomeException
+                                , FBFileSystem
+                                , Error JSONException
+                                , FSPKVStore
+                                , State (Maybe ForvoSpec)] m
+                    => (Text -> Path Rel File)
+                    -> MultiClozeSpec
+                    -> Sem m [RForvoNote]
 runMultiClozeSpecIO f (MultiClozeSpec p is) = do
     ResourceDirs{..} <- input @ResourceDirs
     forM p \a -> do
@@ -154,7 +171,15 @@ runMultiClozeSpecIO f (MultiClozeSpec p is) = do
             Right x -> return ()
       return $ genForvos bs is (map f cs)
 
-runPronunciationSpecIO :: Members '[FBFileSystem, Trace, Input ResourceDirs, FSPKVStore, Error JSONException, Error SomeException, RemoteHttpRequest] m => PronunciationSpec -> Sem m [RForvoNote]
+runPronunciationSpecIO :: Members '[ FBFileSystem
+                                   , Trace
+                                   , Input ResourceDirs
+                                   , FSPKVStore
+                                   , Error JSONException
+                                   , Error SomeException
+                                   , RemoteHttpRequest] m
+                        => PronunciationSpec
+                        -> Sem m [RForvoNote]
 runPronunciationSpecIO (PronunciationSpec f ms a) = evalState @(Maybe ForvoSpec) a $ do
                                                            zs <- forM ms $ runMultiClozeSpecIO f
                                                            return $ join zs
@@ -165,7 +190,17 @@ runMinimalReversed MinimalReversedSpec{..} = return $ val @"from" from :& val @"
 runBasicReversed :: BasicReversedSpec -> Sem m RBasicReversedNoteVF
 runBasicReversed BasicReversedSpec{..} = return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
 
-runSomeSpec :: Members [RemoteHttpRequest, Trace, Error JSONException, FBFileSystem, ClipProcess, Input ResourceDirs, Error SubtitleParseException, Error SomeException, Input ExportDirs, YouTubeDL, FSPKVStore] m => Spec -> Sem m [SomeNote]
+runSomeSpec :: Members [ RemoteHttpRequest
+                       , Trace
+                       , Error JSONException
+                       , FBFileSystem
+                       , ClipProcess
+                       , Input ResourceDirs
+                       , Error SubtitleParseException
+                       , Error SomeException
+                       , Input ExportDirs
+                       , YouTubeDL
+                       , FSPKVStore] m => Spec -> Sem m [SomeNote]
 runSomeSpec p = case p of
       Excerpt xs         -> fmap (fmap SomeNote) $ (join <$> mapM runExcerptSpecIO xs)
       Pronunciation xs   -> fmap (fmap SomeNote) . runPronunciationSpecIO $ xs

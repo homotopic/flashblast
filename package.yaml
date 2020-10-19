@@ -59,6 +59,7 @@ dependencies:
 - aeson
 - attoparsec
 - base >= 4.7 && < 5
+- co-log-polysemy
 - composite-base
 - dhall
 - formatting
