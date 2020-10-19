@@ -66,7 +66,7 @@ interpretFBFileSystem = interpret \case
   CopyFile x y -> U.copyFile x y
   WriteFileBS x y -> BS.writeFile (toFilePath x) y
 
-genExcerpts :: Members '[Error SomeException, FBFileSystem, YouTubeDL, ClipProcess, Reader ExportDirs] m => Path Rel Dir -> ExcerptSpec -> Sem m [RExcerptNote]
+genExcerpts :: Members '[Error SubtitleParseException, FBFileSystem, YouTubeDL, ClipProcess, Reader ExportDirs] m => Path Rel Dir -> ExcerptSpec -> Sem m [RExcerptNote]
 genExcerpts dir (ExcerptSpec {..}) = do
   t <- case source of
     YouTubeDL (YDLInfo x y f) -> do
@@ -74,10 +74,10 @@ genExcerpts dir (ExcerptSpec {..}) = do
       return (dir </> y)
     LocalVideo x -> return (dir </> x)
   ExportDirs{..} <- ask @ExportDirs
-  s' <- either (throwM . SubtitleParseException) return $ A.parseOnly SR.parseSRT subs
-  cs <- mapM (parseRelFile . T.unpack . clipf . T.pack . show . SR.index) s'
-  es <- mapM (parseRelFile . T.unpack . audiof . T.pack . show . SR.index) s'
-  fs <- mapM (parseRelFile . T.unpack . framef . T.pack . show . SR.index) s'
+  s' <- either (throw . SubtitleParseException) return $ A.parseOnly SR.parseSRT subs
+  let cs = map (clipf  . T.pack . show . SR.index) s'
+  let es = map (audiof . T.pack . show . SR.index) s'
+  let fs = map (framef . T.pack . show . SR.index) s'
   cs' <- filterM (fmap not . doesFileExist . (clips </>)) cs
   es' <- filterM (fmap not . doesFileExist . (audio </>)) es
   h <- createTempDirectory
@@ -104,18 +104,15 @@ newtype SubtitleParseException = SubtitleParseException String
 
 instance Exception SubtitleParseException
 
-instance Member (Error SomeException) r => MonadThrow (Sem r) where
-  throwM e = P.throw (toException e)
-
 runExcerptSpecIO :: ResourceDirs -> ExportDirs -> [ExcerptSpec] -> Path Rel File -> IO ()
 runExcerptSpecIO (ResourceDirs{..}) x xs out = do
   zs <- sequenceA <$> forM xs \k -> do
-    runM . runError . runReader x . interpretYouTubeDL . interpretFFMpegCli . interpretFBFileSystem $ genExcerpts video k
+    runM . runError @SubtitleParseException. runReader x . interpretYouTubeDL . interpretFFMpegCli . interpretFBFileSystem $ genExcerpts video k
   case zs of
     Right a -> do
       S.mktree . S.decodeString . toFilePath $ (notes x)
       writeFileUtf8 (toFilePath (notes x </> out)) $ T.intercalate "\n" $ renderExcerptNote <$> join a
-    Left (SomeException p) -> throwIO p
+    Left s -> throwIO s
 
 type FSPKVStore = KVStore (Locale, Text) ForvoStandardPronunciationResponseBody
 

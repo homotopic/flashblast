@@ -41,9 +41,9 @@ instance D.FromDhall VideoSource
 data ExcerptSpec = ExcerptSpec {
   source :: VideoSource
 , subs  :: Text
-, clipf :: Text -> Text
-, audiof :: Text -> Text
-, framef :: Text -> Text
+, clipf  :: Text -> Path Rel File
+, audiof :: Text -> Path Rel File
+, framef :: Text -> Path Rel File
 } deriving Generic
 
 instance D.FromDhall ExcerptSpec
