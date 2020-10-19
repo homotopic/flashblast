@@ -60,21 +60,34 @@ makeSem ''ForvoClient
 newtype ForvoAPIKey = ForvoAPIKey Text
   deriving (Eq, Show, Generic)
 
-interpretForvoClient :: Members '[Embed IO, Input ForvoAPIKey, Error JSONException, Error SomeException] r => Sem (ForvoClient ': r) a -> Sem r a
-interpretForvoClient = interpret \case
-  StandardPronunciation (Locale l) t -> do
-    ForvoAPIKey f <- input @ForvoAPIKey
-    let k = parseRequest $ T.unpack $ "https://apifree.forvo.com/key/" <> f <> "/format/json/action/standard-pronunciation/word/" <> t <> "/language/" <> l
+data RemoteHttpRequest m a where
+  RequestJSON :: FromJSON a => Text -> RemoteHttpRequest m a
+  RequestBS   :: Text -> RemoteHttpRequest m ByteString
+
+makeSem ''RemoteHttpRequest
+
+interpretRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error SomeException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
+interpretRemoteHttpRequest = interpret \case
+  RequestJSON x -> do
+    let k = parseRequest $ T.unpack $ x
     case k of
-      Left e -> throw e
+      Left e -> throw @SomeException e
       Right x -> do
         j <- httpJSON x
         return $ getResponseBody j
-  MP3For x -> do
-    let (MP3Url x') = view mp3Url x
-    let k = parseRequest $ T.unpack $ x'
+  RequestBS x -> do
+    let k = parseRequest $ T.unpack $ x
     case k of
-      Left e -> throw e
+      Left e -> throw @SomeException e
       Right x -> do
         j <- httpBS x
         return $ getResponseBody j
+
+interpretForvoClient :: Members '[RemoteHttpRequest, Input ForvoAPIKey, Error JSONException, Error SomeException] r => Sem (ForvoClient ': r) a -> Sem r a
+interpretForvoClient = interpret \case
+  StandardPronunciation (Locale l) t -> do
+    ForvoAPIKey f <- input @ForvoAPIKey
+    let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/standard-pronunciation/word/" <> t <> "/language/" <> l
+    requestJSON k
+  MP3For x -> let (MP3Url x') = view mp3Url x
+              in requestBS x'

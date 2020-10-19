@@ -11,12 +11,13 @@ import           Path.Dhall           ()
 import Network.HTTP.Simple
 import           Path.Utils
 import           Polysemy
+import Polysemy.Trace
 import           Polysemy.Error       as P
 import Polysemy.Input
 import           Polysemy.Video
 import Polysemy.KVStore
 
-import           RIO                  hiding (Reader, ask, asks, many,
+import           RIO                  hiding (Reader, ask, asks, many, trace,
                                        runReader)
 import           RIO.List
 import           RIO.List.Partial
@@ -110,22 +111,24 @@ instance Exception SubtitleParseException
 
 type FSPKVStore = KVStore (Locale, Text) ForvoStandardPronunciationResponseBody
 
-downloadMP3For :: Members [FSPKVStore, ForvoClient] r => Locale -> Text -> Sem r (Maybe ByteString)
+downloadMP3For :: Members [FSPKVStore, ForvoClient, Trace] r => Locale -> Text -> Sem r (Maybe ByteString)
 downloadMP3For l t = do
   a <- lookupKV @(Locale, Text) @ForvoStandardPronunciationResponseBody (l, t)
   case a of
-    Just x -> p x
+    Just x -> do
+      trace $ "Response for " <> show (l, t) <> " found in cache."
+      p x
     Nothing -> do
       x <- standardPronunciation l t
       updateKV @(Locale, Text) @ForvoStandardPronunciationResponseBody (l,t) $ Just x
       p x
   where
-    p :: Members '[ForvoClient] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
+    p :: Members '[ForvoClient, Trace] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
     p x = case items x of
       [] -> return Nothing
       (x':xs) -> Just <$> mP3For x'
 
-getForvo :: Members '[FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
+getForvo :: Members '[Trace, FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
   unlessM (doesFileExist f) $ do
     x <- downloadMP3For l t
@@ -133,16 +136,17 @@ getForvo l t f = do
       Just x' -> writeFileBS f x'
       Nothing -> return ()
 
-runMultiClozeSpecIO :: Members '[Embed IO, Error SomeException, FBFileSystem, Error JSONException, FSPKVStore, Input (Maybe ForvoSpec)] m => (Text -> Path Rel File) -> MultiClozeSpec -> Sem m [RForvoNote]
-runMultiClozeSpecIO f (MultiClozeSpec p is) =
+runMultiClozeSpecIO :: Members '[RemoteHttpRequest, Trace, Input ResourceDirs, Error SomeException, FBFileSystem, Error JSONException, FSPKVStore, Input (Maybe ForvoSpec)] m => (Text -> Path Rel File) -> MultiClozeSpec -> Sem m [RForvoNote]
+runMultiClozeSpecIO f (MultiClozeSpec p is) = do
+    ResourceDirs{..} <- input @ResourceDirs
     forM p \a -> do
       let (bs, cs) = genClozePhrase a
       s <- input @(Maybe ForvoSpec)
       forM s $ \(ForvoSpec l api) ->
-        forM cs $ \t -> runInputConst @ForvoAPIKey api . interpretForvoClient $ getForvo l t (f t)
+        forM cs $ \t -> runInputConst @ForvoAPIKey api . interpretForvoClient $ getForvo l t (audio </> f t)
       return $ genForvos bs is (map f cs)
 
-runPronunciationSpecIO :: Members '[FBFileSystem, FSPKVStore, Error JSONException, Error SomeException, Embed IO] m => PronunciationSpec -> Sem m [RForvoNote]
+runPronunciationSpecIO :: Members '[FBFileSystem, Trace, Input ResourceDirs, FSPKVStore, Error JSONException, Error SomeException, RemoteHttpRequest] m => PronunciationSpec -> Sem m [RForvoNote]
 runPronunciationSpecIO (PronunciationSpec f ms a) = runInputConst @(Maybe ForvoSpec) a $ do
                                                            zs <- forM ms $ runMultiClozeSpecIO f
                                                            return $ join zs
@@ -153,7 +157,7 @@ runMinimalReversed MinimalReversedSpec{..} = return $ val @"from" from :& val @"
 runBasicReversed :: BasicReversedSpec -> Sem m RBasicReversedNoteVF
 runBasicReversed BasicReversedSpec{..} = return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
 
-runSomeSpec :: Members [Embed IO, Error JSONException, FBFileSystem, ClipProcess, Input ResourceDirs, Error SubtitleParseException, Error SomeException, Input ExportDirs, YouTubeDL, FSPKVStore] m => Spec -> Sem m [SomeNote]
+runSomeSpec :: Members [RemoteHttpRequest, Trace, Error JSONException, FBFileSystem, ClipProcess, Input ResourceDirs, Error SubtitleParseException, Error SomeException, Input ExportDirs, YouTubeDL, FSPKVStore] m => Spec -> Sem m [SomeNote]
 runSomeSpec p = case p of
       Excerpt xs         -> fmap (fmap SomeNote) $ (join <$> mapM runExcerptSpecIO xs)
       Pronunciation xs   -> fmap (fmap SomeNote) . runPronunciationSpecIO $ xs
@@ -166,6 +170,7 @@ runMakeDeck Deck{..} = do
   let ExportDirs{..} = exportDirs
   forM_ parts \(Part out p) -> do
     z <- runM
+       . traceToIO
        . runError @SomeException
        . mapError @JSONParseException SomeException
        . mapError @JSONException SomeException
@@ -173,6 +178,7 @@ runMakeDeck Deck{..} = do
        . runInputConst @ResourceDirs resourceDirs
        . runInputConst @ExportDirs exportDirs
        . interpretFBFileSystem
+       . interpretRemoteHttpRequest
        . interpretYouTubeDL
        . runInputConst (JSONFileStore $(mkRelFile ".forvocache"))
        . runKVStoreAsJSONFileStore
