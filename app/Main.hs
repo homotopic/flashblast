@@ -102,7 +102,7 @@ downloadMP3For l t = do
       p x
   where
     p :: Members '[ForvoClient, Trace] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
-    p x = case items x of
+    p ForvoStandardPronunciationResponseBody{..} = case items of
       []      -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
@@ -136,8 +136,8 @@ errorKillsForvoToggle = runError >=> \case
     Right _ -> return ()
 
 
-runMultiClozeSpecIO :: Members '[ RemoteHttpRequest
-                                , Trace
+runMultiClozeSpecIO :: Members '[
+                                 Trace
                                 , Input ResourceDirs
                                 , FBFileSystem
                                 , FSPKVStore
@@ -163,7 +163,7 @@ runPronunciationSpecIO :: Members '[ FBFileSystem
                                    , FSPKVStore
                                    , ForvoClient
                                    , State (Toggle ForvoEnabled)
-                                   , RemoteHttpRequest] m
+                                   ] m
                         => PronunciationSpec
                         -> Sem m [RForvoNote]
 runPronunciationSpecIO (PronunciationSpec f ms a) = do
@@ -176,8 +176,7 @@ runMinimalReversed MinimalReversedSpec{..} = return $ val @"from" from :& val @"
 runBasicReversed :: BasicReversedSpec -> Sem m RBasicReversedNoteVF
 runBasicReversed BasicReversedSpec{..} = return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
 
-runSomeSpec :: Members [ RemoteHttpRequest
-                       , Trace
+runSomeSpec :: Members [ Trace
                        , FBFileSystem
                        , ClipProcess
                        , ForvoClient
@@ -193,8 +192,8 @@ runSomeSpec p = case p of
       MinimalReversed xs -> mapM (fmap SomeNote . runMinimalReversed) xs
       BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs
 
-runMakeDeck :: Members [ RemoteHttpRequest
-                       , Trace
+runMakeDeck :: Members [
+                        Trace
                        , Error JSONException
                        , FBFileSystem
                        , ClipProcess
@@ -219,18 +218,22 @@ main = do
       . traceToIO
       . evalState @(Toggle ForvoEnabled) (Toggle True)
       . runError @SomeException
-      . mapError @JSONException SomeException
       . mapError @JSONParseException SomeException
       . mapError @SubtitleParseException SomeException
       . interpretFBFileSystem
       . errorKillsForvoToggle @ForvoEnabled @JSONException
-      . interpretRemoteHttpRequest
+      . interpretFFMpegCli
       . interpretYouTubeDL
       . runInputConst (JSONFileStore $(mkRelFile ".forvocache"))
       . runKVStoreAsJSONFileStore
-      . interpretFFMpegCli
+      . mapError @JSONException SomeException
+      . mapError @BadRequestException SomeException
+      . interpretRemoteHttpRequest
+      . mapError @ForvoResponseNotUnderstood SomeException
+      . errorKillsForvoToggle @ForvoEnabled @ForvoLimitReachedException
       . runInputConst @ForvoAPIKey (maybe (ForvoAPIKey "") RIO.id forvoApiKey)
-      . interpretForvoClient $ mapM_ runMakeDeck $ fmap snd . Map.toList $ decks
+      . interpretForvoClient
+      $ mapM_ runMakeDeck $ fmap snd . Map.toList $ decks
    case x of
      Left e -> throwIO e
      Right x' -> return x'

@@ -1,11 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module FlashBlast.ForvoClient where
 
 import Data.Aeson
 import Polysemy
 import Polysemy.Error
 import Polysemy.Input
-import RIO hiding (fromException)
+import RIO hiding (fromException, try)
 import qualified RIO.Text as T
 import Network.HTTP.Simple
 
@@ -28,19 +29,39 @@ data ForvoPronunciationJson = ForvoPronunciationJson {
 , original :: Text
 , hits :: Int
 , username:: Text
-, sex:: Text
+, sex :: Text
 , country:: Text
 , code :: Text
 , langname :: Text
 , pathmp3 ::Text
 , pathogg :: Text
-, rate:: Int
+, rate :: Int
 , num_votes :: Int
-, num_positive_votes:: Int
+, num_positive_votes :: Int
 } deriving (Eq, Show, Generic)
 
 instance FromJSON ForvoPronunciationJson
 instance ToJSON ForvoPronunciationJson
+
+data ForvoAttributeCount = ForvoAttributeCount {
+  total :: Int
+} deriving (Eq, Show, Generic)
+
+instance FromJSON ForvoAttributeCount
+
+data ForvoLanguageListResponseBody = ForvoLanguageListResponseBody {
+  attributes :: ForvoAttributeCount
+, items :: [ForvoLanguageCode]
+} deriving (Eq, Show, Generic)
+
+instance FromJSON ForvoLanguageListResponseBody
+
+data ForvoLanguageCode = ForvoLanguageCode {
+  code :: Text
+, language :: Text
+} deriving (Eq, Show, Generic)
+
+instance FromJSON ForvoLanguageCode
 
 newtype MP3Url = MP3Url Text
   deriving (Eq, Show, Generic)
@@ -51,9 +72,20 @@ class HasMP3Url x where
 instance HasMP3Url ForvoPronunciationJson where
   mp3Url = lens (MP3Url . pathmp3) undefined
 
+newtype OggUrl = OggUrl Text
+  deriving (Eq, Show, Generic)
+
+class HasOggUrl x where
+  oggUrl :: Lens' x OggUrl
+
+instance HasOggUrl ForvoPronunciationJson where
+  oggUrl = lens (OggUrl . pathogg) undefined
+
 data ForvoClient m a where
   StandardPronunciation :: Locale -> Text -> ForvoClient m ForvoStandardPronunciationResponseBody
-  MP3For :: HasMP3Url x => x -> ForvoClient m ByteString
+  LanguageList          :: ForvoClient m ForvoLanguageListResponseBody
+  MP3For                :: HasMP3Url x => x -> ForvoClient m ByteString
+  OggFor                :: HasOggUrl x => x -> ForvoClient m ByteString
 
 makeSem ''ForvoClient
 
@@ -64,30 +96,81 @@ data RemoteHttpRequest m a where
   RequestJSON :: FromJSON a => Text -> RemoteHttpRequest m a
   RequestBS   :: Text -> RemoteHttpRequest m ByteString
 
+data ForvoLimitReachedException = ForvoLimitReachedException
+  deriving (Eq, Show, Generic)
+
+data ForvoLimitText = ForvoLimitText
+
+instance FromJSON ForvoLimitText where
+  parseJSON = withText "ForvoLimitText" $ \case
+    "Limit/day reached." -> return ForvoLimitText
+    _ -> fail "Unknown response"
+
+data ForvoLimitResponse = ForvoLimitResponse [ForvoLimitText]
+  deriving Generic
+
+instance FromJSON ForvoLimitResponse
+
+data ForvoResponseNotUnderstood = ForvoResponseNotUnderstood ByteString
+  deriving (Show, Eq, Generic)
+
+instance Exception ForvoResponseNotUnderstood where
+  displayException (ForvoResponseNotUnderstood x) = show x
+
 makeSem ''RemoteHttpRequest
 
-interpretRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error SomeException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
+data BadRequestException where
+  BadRequestException :: Exception e => e -> BadRequestException
+
+deriving instance Show BadRequestException
+
+instance Exception BadRequestException where
+  displayException = show
+
+interpretRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error BadRequestException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
 interpretRemoteHttpRequest = interpret \case
   RequestJSON x -> do
-    let k = parseRequest $ T.unpack x
+    let k = parseRequestThrow $ T.unpack x
     case k of
-      Left e -> throw @SomeException e
+      Left e -> throw @BadRequestException $ BadRequestException e
       Right x' -> do
         j <- fromException @JSONException $ httpJSON x'
         return $ getResponseBody j
   RequestBS x -> do
     let k = parseRequest $ T.unpack x
     case k of
-      Left e -> throw @SomeException e
+      Left e -> throw @BadRequestException $ BadRequestException e
       Right x' -> do
-        j <- fromException @JSONException $ httpBS x'
+        j <- httpBS x'
         return $ getResponseBody j
 
-interpretForvoClient :: Members '[RemoteHttpRequest, Input ForvoAPIKey] r => Sem (ForvoClient ': r) a -> Sem r a
-interpretForvoClient = interpret \case
+throwIfLimitReached :: Member (Error ForvoLimitReachedException) r => ByteString -> Sem r ByteString
+throwIfLimitReached z = let (z' :: Either String ForvoLimitResponse) = eitherDecodeStrict z
+                        in case z' of
+                          Left _  -> return z
+                          Right _ -> throw ForvoLimitReachedException
+
+interpretForvoClient :: Members '[RemoteHttpRequest] r => Sem (ForvoClient ': r) a -> Sem (Input ForvoAPIKey ': Error ForvoLimitReachedException ': Error ForvoResponseNotUnderstood ': r) a
+interpretForvoClient = reinterpret3 \case
   StandardPronunciation (Locale l) t -> do
     ForvoAPIKey f <- input @ForvoAPIKey
     let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/standard-pronunciation/word/" <> t <> "/language/" <> l
-    requestJSON k
+    z <- requestBS k
+    _ <- throwIfLimitReached z
+    let (y' :: Either String ForvoStandardPronunciationResponseBody) = eitherDecodeStrict z
+    case y' of
+      Left _ -> throw @ForvoResponseNotUnderstood (ForvoResponseNotUnderstood z)
+      Right x -> return x
+  LanguageList -> do
+    ForvoAPIKey f <- input @ForvoAPIKey
+    let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/language-list/order/name"
+    z <- requestBS k
+    _ <- throwIfLimitReached z
+    let (y' :: Either String ForvoLanguageListResponseBody) = eitherDecodeStrict z
+    case y' of
+      Left _ -> throw @ForvoResponseNotUnderstood (ForvoResponseNotUnderstood z)
+      Right x -> return x
   MP3For x -> let (MP3Url x') = view mp3Url x
-              in requestBS x'
+              in requestBS x' >>= throwIfLimitReached
+  OggFor x -> let (OggUrl x') = view oggUrl x
+              in requestBS x' >>= throwIfLimitReached
