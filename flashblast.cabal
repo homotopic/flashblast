@@ -42,9 +42,11 @@ library
     , attoparsec
     , base >=4.7 && <5
     , co-log-polysemy
+    , co-log-polysemy-formatting
     , composite-base
     , dhall
     , formatting
+    , http-client
     , http-conduit
     , lucid
     , megaparsec
@@ -79,10 +81,12 @@ executable flashblast
     , attoparsec
     , base >=4.7 && <5
     , co-log-polysemy
+    , co-log-polysemy-formatting
     , composite-base
     , dhall
     , flashblast
     , formatting
+    , http-client
     , http-conduit
     , lucid
     , megaparsec

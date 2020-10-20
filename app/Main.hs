@@ -16,7 +16,7 @@ import           Polysemy.KVStore
 import           Polysemy.Trace
 import           Polysemy.Video
 
-import           Colog.Polysemy
+import           Colog.Polysemy.Formatting
 import           FlashBlast.AnkiDB
 import           FlashBlast.ClozeParse
 import           FlashBlast.Config
@@ -125,6 +125,24 @@ getForvo l t f = do
           writeFileBS f x'
         Nothing -> return ()
 
+data Toggle a = Toggle Bool
+  deriving (Eq, Show, Generic)
+
+data ToggleKilled a = ToggleKilled
+  deriving (Eq, Show, Generic)
+
+data ForvoEnabled
+
+errorKillsForvoToggle :: forall a e r b. Members '[State (Toggle a), Error e, Trace] r => Sem r b -> Sem r ()
+errorKillsForvoToggle x = do
+  z <- P.try @e x
+  case z of
+    Left _ -> do
+      trace $ "Something went wrong with forvo. Turning forvo off for remainer of run."
+      put @(Toggle a) $ Toggle False
+    Right _ -> return ()
+
+
 runMultiClozeSpecIO :: Members '[ RemoteHttpRequest
                                 , Trace
                                 , Input ResourceDirs
@@ -132,24 +150,20 @@ runMultiClozeSpecIO :: Members '[ RemoteHttpRequest
                                 , FBFileSystem
                                 , Error JSONException
                                 , FSPKVStore
-                                , State (Maybe ForvoSpec)] m
+                                , ForvoClient
+                                , State (Toggle ForvoEnabled)] m
                     => (Text -> Path Rel File)
+                    -> Maybe ForvoSpec
                     -> MultiClozeSpec
                     -> Sem m [RForvoNote]
-runMultiClozeSpecIO f (MultiClozeSpec p is) = do
+runMultiClozeSpecIO f s (MultiClozeSpec p is) = do
     ResourceDirs{..} <- input @ResourceDirs
     forM p \a -> do
       let (bs, cs) = genClozePhrase a
-      s <- get @(Maybe ForvoSpec)
-      forM_ s $ \(ForvoSpec l api) ->
-        forM cs $ \t -> do
-          z <- P.try @JSONException $
-            runInputConst @ForvoAPIKey api . interpretForvoClient $ getForvo l t (audio </> f t)
-          case z of
-            Left e -> do
-              trace $ "Something went wrong with forvo, skipping forvo for the remainder of run."
-              put @(Maybe ForvoSpec) Nothing
-            Right x -> return ()
+      Toggle k <- get @(Toggle ForvoEnabled)
+      when k $ do
+        forM_ s $ \(ForvoSpec l api) ->
+          forM cs $ \t -> errorKillsForvoToggle @ForvoEnabled @JSONException $ getForvo l t (audio </> f t)
       return $ genForvos bs is (map f cs)
 
 runPronunciationSpecIO :: Members '[ FBFileSystem
@@ -158,12 +172,14 @@ runPronunciationSpecIO :: Members '[ FBFileSystem
                                    , FSPKVStore
                                    , Error JSONException
                                    , Error SomeException
+                                   , ForvoClient
+                                   , State (Toggle ForvoEnabled)
                                    , RemoteHttpRequest] m
                         => PronunciationSpec
                         -> Sem m [RForvoNote]
-runPronunciationSpecIO (PronunciationSpec f ms a) = evalState @(Maybe ForvoSpec) a $ do
-                                                           zs <- forM ms $ runMultiClozeSpecIO f
-                                                           return $ join zs
+runPronunciationSpecIO (PronunciationSpec f ms a) = do
+                                                     zs <- forM ms $ runMultiClozeSpecIO f a
+                                                     return $ join zs
 
 runMinimalReversed :: MinimalReversedSpec -> Sem m RMinimalNoteVF
 runMinimalReversed MinimalReversedSpec{..} = return $ val @"from" from :& val @"to" to :& RNil
@@ -176,6 +192,8 @@ runSomeSpec :: Members [ RemoteHttpRequest
                        , Error JSONException
                        , FBFileSystem
                        , ClipProcess
+                       , ForvoClient
+                       , State (Toggle ForvoEnabled)
                        , Input ResourceDirs
                        , Error SubtitleParseException
                        , Error SomeException
@@ -188,33 +206,45 @@ runSomeSpec p = case p of
       MinimalReversed xs -> mapM (fmap SomeNote . runMinimalReversed) xs
       BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs
 
-runMakeDeck :: Deck -> IO ()
+runMakeDeck :: Members [ RemoteHttpRequest
+                       , Trace
+                       , Error JSONException
+                       , FBFileSystem
+                       , ClipProcess
+                       , ForvoClient
+                       , State (Toggle ForvoEnabled)
+                       , Error SubtitleParseException
+                       , Error SomeException
+                       , YouTubeDL
+                       , FSPKVStore] m => Deck -> Sem m ()
 runMakeDeck Deck{..} = do
   let ResourceDirs{..} = resourceDirs
   let ExportDirs{..} = exportDirs
-  forM_ parts \(Part out p) -> do
-    z <- runM
-       . traceToIO
-       . runError @SomeException
-       . mapError @JSONException SomeException
-       . mapError @JSONParseException SomeException
-       . mapError @SubtitleParseException SomeException
-       . runInputConst @ResourceDirs resourceDirs
-       . runInputConst @ExportDirs exportDirs
-       . interpretFBFileSystem
-       . interpretRemoteHttpRequest
-       . interpretYouTubeDL
-       . runInputConst (JSONFileStore $(mkRelFile ".forvocache"))
-       . runKVStoreAsJSONFileStore
-       . interpretFFMpegCli
-       $ runSomeSpec p
-    case z of
-      Left x -> throwIO x
-      Right x -> do
-        S.mktree . S.decodeString . toFilePath $ notes
-        writeFileUtf8 (toFilePath (notes </> out)) $ T.intercalate "\n" $ renderNote <$> x
+  runInputConst @ResourceDirs resourceDirs $
+    runInputConst @ExportDirs exportDirs $
+      forM_ parts \(Part out p) -> do
+        x <- runSomeSpec p
+        writeFileUTF8 (notes </> out) $ T.intercalate "\n" $ renderNote <$> x
 
 main :: IO ()
 main = do
-  x <- D.input D.auto "./index.dhall"
-  mapM_ runMakeDeck $ fmap snd . Map.toList . decks $ x
+   z <- D.input D.auto "./index.dhall"
+   x <- runM
+      . traceToIO
+      . evalState @(Toggle ForvoEnabled) (Toggle True)
+      . runError @SomeException
+      . mapError @JSONException SomeException
+      . mapError @TestException SomeException
+      . mapError @JSONParseException SomeException
+      . mapError @SubtitleParseException SomeException
+      . interpretFBFileSystem
+      . interpretRemoteHttpRequest
+      . interpretYouTubeDL
+      . runInputConst (JSONFileStore $(mkRelFile ".forvocache"))
+      . runKVStoreAsJSONFileStore
+      . interpretFFMpegCli
+      . runInputConst @ForvoAPIKey (ForvoAPIKey "43a3223fde937ef15e4f19ea29847d93")
+      . interpretForvoClient $ mapM_ runMakeDeck $ fmap snd . Map.toList . decks $ z
+   case x of
+     Left e -> throwIO e
+     Right x' -> return x'

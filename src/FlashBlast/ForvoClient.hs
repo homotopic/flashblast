@@ -8,6 +8,7 @@ import Polysemy.Input
 import RIO hiding (fromException)
 import qualified RIO.Text as T
 import Network.HTTP.Simple
+import Network.HTTP.Client
 
 newtype Locale = Locale Text
   deriving (Eq, Show, Generic, Ord)
@@ -65,6 +66,17 @@ data RemoteHttpRequest m a where
   RequestBS   :: Text -> RemoteHttpRequest m ByteString
 
 makeSem ''RemoteHttpRequest
+
+data TestException = TestException
+   deriving (Eq, Show)
+
+instance Exception TestException where
+   displayException x = "ff"
+
+remoteHttpRequestAlwaysFails :: Members '[Embed IO, Error TestException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
+remoteHttpRequestAlwaysFails = interpret \case
+  RequestJSON x -> throw @TestException TestException
+  RequestBS x -> undefined
 
 interpretRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error SomeException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
 interpretRemoteHttpRequest = interpret \case

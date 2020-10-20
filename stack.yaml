@@ -1,4 +1,4 @@
-resolver: nightly-2020-09-29
+resolver: nightly-2020-10-19
 packages:
 - .
 extra-deps:
@@ -11,5 +11,7 @@ extra-deps:
 - unliftio-path-0.0.2.0
 - polysemy-video-0.1.1.0
 - polysemy-zoo-0.7.0.1
+- co-log-polysemy-formatting-0.1.0.0
+- formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
 nix:
   packages: [zlib, libffi, ffmpeg, pkg-config]

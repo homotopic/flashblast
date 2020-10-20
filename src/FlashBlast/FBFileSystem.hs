@@ -15,6 +15,7 @@ data FBFileSystem m a where
   DoesFileExist :: Path b File -> FBFileSystem m Bool
   CopyFile :: Path b File -> Path b' File -> FBFileSystem m ()
   WriteFileBS :: Path b File -> BS.ByteString -> FBFileSystem m ()
+  WriteFileUTF8 :: Path b File -> Text -> FBFileSystem m ()
 
 makeSem ''FBFileSystem
 
@@ -28,3 +29,4 @@ interpretFBFileSystem = interpret \case
   DoesFileExist x     -> U.doesFileExist x
   CopyFile x y -> U.copyFile x y
   WriteFileBS x y -> BS.writeFile (toFilePath x) y
+  WriteFileUTF8 x y -> writeFileUtf8 (toFilePath x) y
