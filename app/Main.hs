@@ -32,7 +32,6 @@ import           RIO.List
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
 import qualified Text.Subtitles.SRT       as SR
-import qualified Turtle                   as S
 
 
 fromTime :: SR.Time -> Time

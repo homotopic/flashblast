@@ -20,13 +20,13 @@ newtype JSONParseException = JSONParseException String
 instance Exception JSONParseException where
   displayException (JSONParseException x) = x
 
-eitherDecodeOrCreate :: (Monoid a, ToJSON a, FromJSON a, MonadIO m) => Path Rel File -> a -> m (Either String a)
+eitherDecodeOrCreate :: (ToJSON a, FromJSON a, MonadIO m) => Path Rel File -> a -> m (Either String a)
 eitherDecodeOrCreate f x = do
   whenM (fmap not . U.doesFileExist $ f) $ liftIO $ encodeFile (toFilePath f) x
   liftIO $ eitherDecodeFileStrict' (toFilePath f)
 
 runKVStoreAsJSONFileStore :: (Members '[Embed IO, Input JSONFileStore, Error JSONParseException] r,
-                              FromJSONKey k, ToJSONKey k, ToJSON k, FromJSON k, FromJSON v, ToJSON v, Ord k)
+                              FromJSONKey k, ToJSONKey k, FromJSON v, ToJSON v, Ord k)
                           => Sem (KVStore k v ': r) a -> Sem r a
 runKVStoreAsJSONFileStore = interpret \case
   LookupKV k -> do
