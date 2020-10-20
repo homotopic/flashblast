@@ -86,7 +86,6 @@ instance D.FromDhall Locale
 
 data ForvoSpec = ForvoSpec {
   locale :: Locale
-, apiKey :: ForvoAPIKey
 } deriving (Eq, Show, Generic)
 
 instance D.FromDhall ForvoSpec
@@ -109,6 +108,7 @@ instance D.FromDhall Spec
 
 data FlashBlastConfig = FlashBlastConfig {
   decks :: Map Text Deck
+, forvoApiKey :: Maybe ForvoAPIKey
 } deriving Generic
 
 instance D.FromDhall FlashBlastConfig

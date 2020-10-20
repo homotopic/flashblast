@@ -24,7 +24,7 @@ let BasicReversedSpec =
       , to_extra : VariField
       }
 
-let Forvo = { locale : Text, apiKey : Text }
+let Forvo = { locale : Text }
 
 let Spec =
       < Pronunciation :
