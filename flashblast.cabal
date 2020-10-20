@@ -46,7 +46,6 @@ library
     , composite-base
     , dhall
     , formatting
-    , http-client
     , http-conduit
     , lucid
     , megaparsec
@@ -86,7 +85,6 @@ executable flashblast
     , dhall
     , flashblast
     , formatting
-    , http-client
     , http-conduit
     , lucid
     , megaparsec

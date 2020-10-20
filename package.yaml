@@ -64,7 +64,6 @@ dependencies:
 - composite-base
 - dhall
 - formatting
-- http-client
 - http-conduit
 - lucid
 - megaparsec

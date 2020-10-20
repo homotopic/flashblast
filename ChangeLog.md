@@ -1,5 +1,10 @@
 # Changelog for flashblast
 
+## (v0.0.4.0)
+
+* Add basic Forvo Client.
+* Add dhall prelude.
+
 ## (v0.0.3.0)
 
 * Add crude logic for not doing things twice. You will need to delete things in out/ if you want it to rerun.

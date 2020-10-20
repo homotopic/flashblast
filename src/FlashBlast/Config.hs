@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module FlashBlast.Config where
 
 import qualified Dhall                  as D

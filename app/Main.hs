@@ -1,6 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 import           Composite.Record
 import qualified Data.Attoparsec.Text     as A
@@ -16,8 +15,6 @@ import           Polysemy.KVStore
 import           Polysemy.Trace
 import           Polysemy.Video
 
-import           Colog.Polysemy.Formatting
-import           FlashBlast.AnkiDB
 import           FlashBlast.ClozeParse
 import           FlashBlast.Config
 import           FlashBlast.FBFileSystem
@@ -58,7 +55,6 @@ runExcerptSpecIO :: Members '[Error SubtitleParseException
                        , ClipProcess] m
                        => ExcerptSpec -> Sem m [RExcerptNote]
 runExcerptSpecIO ExcerptSpec {..} = do
-  ResourceDirs{..} <- input @ResourceDirs
   ExportDirs{..} <- input @ExportDirs
   t <- interpretVideoSource source
   s' <- either (throw . SubtitleParseException) return $ A.parseOnly SR.parseSRT subs
@@ -108,7 +104,7 @@ downloadMP3For l t = do
     p :: Members '[ForvoClient, Trace] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
     p x = case items x of
       []      -> return Nothing
-      (x':xs) -> Just <$> mP3For x'
+      (x':_) -> Just <$> mP3For x'
 
 getForvo :: Members '[Trace, FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
@@ -209,7 +205,6 @@ runMakeDeck :: Members [ RemoteHttpRequest
                        , YouTubeDL
                        , FSPKVStore] m => Deck -> Sem m ()
 runMakeDeck Deck{..} = do
-  let ResourceDirs{..} = resourceDirs
   let ExportDirs{..} = exportDirs
   runInputConst @ResourceDirs resourceDirs $
     runInputConst @ExportDirs exportDirs $
@@ -225,7 +220,6 @@ main = do
       . evalState @(Toggle ForvoEnabled) (Toggle True)
       . runError @SomeException
       . mapError @JSONException SomeException
-      . mapError @TestException SomeException
       . mapError @JSONParseException SomeException
       . mapError @SubtitleParseException SomeException
       . interpretFBFileSystem
