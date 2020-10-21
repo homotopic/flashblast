@@ -61,6 +61,7 @@ library
     , semialign
     , subtitleParser
     , temporary
+    , text
     , these
     , turtle
     , unliftio-path
@@ -100,6 +101,7 @@ executable flashblast
     , semialign
     , subtitleParser
     , temporary
+    , text
     , these
     , turtle
     , unliftio-path

@@ -6,8 +6,13 @@ import qualified UnliftIO.Path.Directory as U
 import qualified System.IO.Temp as U
 import Path
 import qualified RIO as RIO
-import RIO (Text, Bool(..), IO, (>>=), ($))
+import RIO (Text, Bool(..), IO, (>>=), ($), return, (.), fmap)
 import qualified RIO.ByteString as BS
+import Colog.Polysemy
+import Colog.Polysemy.Formatting
+import Formatting
+import Path.Utils
+import GHC.Stack
 
 data FSExist m a where
   DoesFileExist :: Path b File -> FSExist m Bool
@@ -72,3 +77,45 @@ runFSTempIO = interpret \case
   CreateTempDirectory -> do
     x <- embed U.getCanonicalTemporaryDirectory
     embed $ U.createTempDirectory x "" >>= parseAbsDir
+
+data FileExists where
+  FileExists    :: Path b File -> FileExists
+  FileNotExists :: Path b File -> FileExists
+
+data DirExists where
+  DirExists    :: Path b Dir -> DirExists
+  DirNotExists :: Path b Dir -> DirExists
+
+logFileExists :: Members '[FSExist, Log FileExists] r => Sem r a -> Sem r a
+logFileExists = intercept \case
+  DoesFileExist x -> do
+    z <- doesFileExist x
+    case z of
+      True  -> log $ FileExists x
+      False -> log $ FileNotExists x
+    return z
+  DoesDirExist x -> doesDirExist x
+
+logDirExists :: Members '[FSExist, Log DirExists] r => Sem r a -> Sem r a
+logDirExists = intercept \case
+  DoesDirExist x  -> do
+    z <- doesDirExist x
+    case z of
+      True  -> log $ DirExists x
+      False -> log $ DirNotExists x
+    return z
+  DoesFileExist x -> doesFileExist x
+
+mapLog :: forall k x r a. Members '[Log x] r => (k -> x) -> Sem (Log k ': r) a -> Sem r a
+mapLog f = interpret $ \(Log x) -> log (f x)
+
+logInfo' :: HasCallStack => Text -> Msg Severity
+logInfo' = Msg Info callStack
+
+path :: Format r (Path b t -> r)
+path = fmap (. toFilePathText) stext
+
+fileExistsLogText :: FileExists -> Text
+fileExistsLogText = \case
+  FileExists f    -> sformat ("File " % path % " found in filesystem.") f
+  FileNotExists f -> sformat ("File " % path % " not found in filesystem.") f

@@ -2,6 +2,12 @@
 {-# LANGUAGE TemplateHaskell       #-}
 
 import           Colog.Polysemy
+import RIO.Time
+import Colog.Polysemy.Formatting.LogEnv
+import Colog.Polysemy.Formatting.ThreadTimeMessage
+import Colog.Polysemy.Formatting.Color
+import Colog.Polysemy.Formatting.Render
+import Data.Text.Lazy.Builder (Builder)
 import           Colog.Polysemy.Formatting
 import           Composite.Record
 import qualified Data.Attoparsec.Text     as A
@@ -17,7 +23,7 @@ import           Polysemy.KVStore
 import           Polysemy.Video
 
 import           FlashBlast.ClozeParse
-import           FlashBlast.Config
+import           FlashBlast.Config hiding (format)
 import           FlashBlast.FS
 import           FlashBlast.Conventions
 import           FlashBlast.ForvoClient hiding (id)
@@ -25,19 +31,24 @@ import           FlashBlast.JSONFileStore
 import           FlashBlast.YouTubeDL
 import           Polysemy.State
 import           RIO                      hiding (Reader, ask, asks, log, many,
-                                           runReader, trace, logInfo, writeFileUtf8)
+                                           runReader, trace, logInfo, writeFileUtf8, Builder)
 import           RIO.List
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
 import Formatting
 import qualified Text.Subtitles.SRT       as SR
 
-
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
 
 fromRange :: SR.Range -> Range
 fromRange (SR.Range f t) = Range (fromTime f) (fromTime t)
+
+fFieldsGreenBarSep :: UseColor -> Format r ([Builder] -> r)
+fFieldsGreenBarSep useColor = later $ \fields ->
+  let withFG = getWithFG useColor
+      sep = format builder $ withFG Green " | "
+  in bformat (intercalated sep builder) fields
 
 interpretVideoSource :: Members '[Input ResourceDirs, YouTubeDL] m => VideoSource -> Sem m (Path Rel File)
 interpretVideoSource = \case
@@ -115,9 +126,8 @@ getForvo :: Members '[Log (Msg Severity), FSDir, FSWrite, FSExist, FSPKVStore, F
 getForvo l t f = do
   z <- doesFileExist f
   case z of
-    True  -> logInfo (accessed id stext % " found in filesystem.") (toFilePathText f)
+    True -> return ()
     False -> do
-      logInfo (accessed id stext % " not found in filesystem.") (toFilePathText f)
       x <- downloadMP3For l t
       case x of
         Just x' -> do
@@ -133,13 +143,27 @@ data ToggleKilled a = ToggleKilled
 
 data ForvoEnabled
 
-errorKillsForvoToggle :: forall a e r b. Members '[State (Toggle a), Log (Msg Severity)] r => Sem (Error e ': r) b -> Sem r ()
-errorKillsForvoToggle = runError >=> \case
+errorKillsToggle :: forall a e r b. Members '[State (Toggle a), Log (ToggleKilled a)] r => Sem (Error e ': r) b -> Sem r ()
+errorKillsToggle = runError >=> \case
     Left _ -> do
-      logInfo $ "Something went wrong with forvo. Turning forvo off for remainer of run."
+      log @(ToggleKilled a) ToggleKilled
       put @(Toggle a) $ Toggle False
     Right _ -> return ()
 
+forvoToggleKilledLogInfo :: Members '[Log (Msg Severity)] r => Sem (Log (ToggleKilled ForvoEnabled) ': r) a -> Sem r a
+forvoToggleKilledLogInfo = interpret \case
+  Log x -> logInfo "Something went wrong with Forvo. Turning Forvo Off for remainer of run."
+
+
+renderThreadTimeMessage' :: LogEnv -> ThreadTimeMessage -> T.Text
+renderThreadTimeMessage' (LogEnv useColor zone) (ThreadTimeMessage threadId time (Msg severity stack message)) =
+  let withFG = getWithFG useColor
+  in sformat (fFieldsGreenBarSep useColor)
+    [ bformat (fSeverity withFG) severity
+    , bformat (fIso8601Tz withFG) (utcToZonedTime zone time)
+    , bformat fThread threadId
+    , bformat stext message
+    ]
 
 runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
                                 , Input ResourceDirs
@@ -230,6 +254,7 @@ main :: IO ()
 main = do
    FlashBlastConfig{..} <- D.input D.auto "./index.dhall"
    logEnvStderr <- newLogEnv stderr
+   let logT = logTextStderr & cmap (renderThreadTimeMessage' logEnvStderr)
    x <- runM
       . runFSExistIO
       . runFSReadIO
@@ -237,13 +262,15 @@ main = do
       . runFSDirIO
       . runFSTempIO
       . runFSCopyIO
-      . runLogAction (logTextStderr & cmap (renderThreadTimeMessage logEnvStderr))
+      . runLogAction  logT
       . addThreadAndTimeToLog
+      . forvoToggleKilledLogInfo
+      . mapLog (logInfo' . fileExistsLogText)
+      . logFileExists
       . evalState @(Toggle ForvoEnabled) (Toggle True)
       . runError @SomeException
       . mapError @JSONParseException SomeException
       . mapError @SubtitleParseException SomeException
-      . errorKillsForvoToggle @ForvoEnabled @JSONException
       . interpretFFMpegCli
       . interpretYouTubeDL
       . runInputConst (JSONFileStore $(mkRelFile ".forvocache"))
@@ -252,7 +279,7 @@ main = do
       . mapError @BadRequestException SomeException
       . interpretRemoteHttpRequest
       . mapError @ForvoResponseNotUnderstood SomeException
-      . errorKillsForvoToggle @ForvoEnabled @ForvoLimitReachedException
+      . errorKillsToggle @ForvoEnabled @ForvoLimitReachedException
       . runInputConst @ForvoAPIKey (maybe (ForvoAPIKey "") RIO.id forvoApiKey)
       . interpretForvoClient
       $ mapM_ runMakeDeck $ fmap snd . Map.toList $ decks

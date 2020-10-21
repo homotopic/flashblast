@@ -79,6 +79,7 @@ dependencies:
 - semialign
 - subtitleParser
 - temporary
+- text
 - these
 - turtle
 - unliftio-path
