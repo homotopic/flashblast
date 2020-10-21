@@ -195,13 +195,11 @@ runSomeSpec p = case p of
       BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs
 
 runMakeDeck :: Members [ Log (Msg Severity)
-                       , Error JSONException
                        , FBFileSystem
                        , ClipProcess
                        , ForvoClient
                        , State (Toggle ForvoEnabled)
                        , Error SubtitleParseException
-                       , Error SomeException
                        , YouTubeDL
                        , FSPKVStore] m => Deck -> Sem m ()
 runMakeDeck Deck{..} = do
