@@ -123,18 +123,14 @@ downloadMP3For l@(Locale l') t = do
       []      -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
-getForvo :: Members '[Log (Msg Severity), FSDir, FSWrite, FSExist, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
+getForvo :: Members '[Log (Msg Severity), FSKVStore Rel, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
-  z <- doesFileExist f
+  z <- lookupKV f
   case z of
-    True -> return ()
-    False -> do
-      x <- downloadMP3For l t
-      case x of
-        Just x' -> do
-          createDirectory (parent f)
-          writeFileBS f x'
-        Nothing -> return ()
+    Just _ -> return ()
+    Nothing -> do
+      x' <- downloadMP3For l t
+      updateKV f x'
 
 data Toggle a = Toggle Bool
   deriving (Eq, Show, Generic)
@@ -175,7 +171,7 @@ runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
                                 , Input ResourceDirs
                                 , FSPKVStore
                                 , FSWrite
-                                , FSCopy
+                                , FSRead
                                 , FSExist
                                 , FSDir
                                 , ForvoClient
@@ -186,23 +182,23 @@ runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
                     -> Sem m [RForvoNote]
 runMultiClozeSpecIO f s (MultiClozeSpec p is) = do
     ResourceDirs{..} <- input @ResourceDirs
-    forM p \a -> do
+    runFSKVStoreRelIn audio $  forM p \a -> do
       let (bs, cs) = genClozePhrase a
       Toggle k <- get @(Toggle ForvoEnabled)
       when k $ do
         forM_ s $ \(ForvoSpec l) ->
-          forM cs $ \t -> getForvo l t (audio </> f t)
+          forM cs $ \t -> getForvo l t (f t)
       return $ genForvos bs is (map f cs)
 
 runPronunciationSpecIO :: Members '[Input ResourceDirs
                                    , Log (Msg Severity)
                                    , FSPKVStore
                                    , ForvoClient
-                                   , State (Toggle ForvoEnabled)
                                    , FSWrite
-                                   , FSCopy
                                    , FSExist
+                                   , FSRead
                                    , FSDir
+                                   , State (Toggle ForvoEnabled)
                                    ] m
                         => PronunciationSpec
                         -> Sem m [RForvoNote]
@@ -228,6 +224,7 @@ runSomeSpec :: Members [ Log (Msg Severity)
                        , FSExist
                        , FSWrite
                        , FSDir
+                       , FSRead
                        , FSCopy
                        , FSPKVStore] m => Spec -> Sem m [SomeNote]
 runSomeSpec p = case p of
@@ -247,6 +244,7 @@ runMakeDeck :: Members [ Log (Msg Severity)
                        , FSTemp
                        , FSDir
                        , FSCopy
+                       , FSRead
                        , FSPKVStore] m => Deck -> Sem m ()
 runMakeDeck Deck{..} = do
   let ExportDirs{..} = exportDirs
@@ -255,6 +253,39 @@ runMakeDeck Deck{..} = do
       forM_ parts \(Part out p) -> do
         x <- runSomeSpec p
         writeFileUtf8 (notes </> out) $ T.intercalate "\n" $ renderNote <$> x
+
+type FSKVStore b = KVStore (Path b File) ByteString
+
+runFSKVStoreRelIn :: Members '[FSExist, FSRead, FSWrite, FSDir] r => Path b Dir -> Sem (FSKVStore Rel ': r) a -> Sem r a
+runFSKVStoreRelIn d = interpret \case
+  LookupKV k   -> do
+    createDirectory d
+    z <- doesFileExist (d </> k)
+    case z of
+      True  -> fmap Just . readFileBS $ d </> k
+      False -> return Nothing
+  UpdateKV k v -> do
+    createDirectory d
+    case v of
+      Nothing -> pure ()
+      Just x  -> writeFileBS (d </> k) x
+
+data PronunciationDictionary m a where
+  DiscoverClozePhrases :: PronunciationSpec -> PronunciationDictionary m [(Locale, Text)]
+  DoesClozeFileExist   :: (Locale, Text) -> PronunciationDictionary m Bool
+  FetchClozeFile       :: (Locale, Text) -> PronunciationDictionary m ByteString
+  PlaceClozeFile       :: (Locale, Text) -> ByteString -> PronunciationDictionary m ()
+
+makeSem ''PronunciationDictionary
+
+{--
+f :: Members '[PronunciationDictionary] r => PronunciationSpec -> Sem r ()
+f x = do
+  zs <- discoverClozePhrases x
+  forM zs $ \z -> do
+    x <- doesClozeFileExist z
+--}
+
 
 main :: IO ()
 main = do
