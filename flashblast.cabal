@@ -27,8 +27,8 @@ library
       FlashBlast.ClozeParse
       FlashBlast.Config
       FlashBlast.Conventions
-      FlashBlast.FBFileSystem
       FlashBlast.ForvoClient
+      FlashBlast.FS
       FlashBlast.JSONFileStore
       FlashBlast.YouTubeDL
   other-modules:

@@ -14,19 +14,18 @@ import           Polysemy
 import           Polysemy.Error           as P
 import           Polysemy.Input
 import           Polysemy.KVStore
-import           Polysemy.Trace
 import           Polysemy.Video
 
 import           FlashBlast.ClozeParse
 import           FlashBlast.Config
-import           FlashBlast.FBFileSystem
+import           FlashBlast.FS
 import           FlashBlast.Conventions
 import           FlashBlast.ForvoClient hiding (id)
 import           FlashBlast.JSONFileStore
 import           FlashBlast.YouTubeDL
 import           Polysemy.State
 import           RIO                      hiding (Reader, ask, asks, log, many,
-                                           runReader, trace, logInfo)
+                                           runReader, trace, logInfo, writeFileUtf8)
 import           RIO.List
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
@@ -51,7 +50,10 @@ interpretVideoSource = \case
     return (video </> x)
 
 runExcerptSpecIO :: Members '[Error SubtitleParseException
-                       , FBFileSystem
+                       , FSExist
+                       , FSTemp
+                       , FSCopy
+                       , FSDir
                        , Input ExportDirs
                        , Input ResourceDirs
                        , YouTubeDL
@@ -109,7 +111,7 @@ downloadMP3For l@(Locale l') t = do
       []      -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
-getForvo :: Members '[Log (Msg Severity), FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
+getForvo :: Members '[Log (Msg Severity), FSDir, FSWrite, FSExist, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
   z <- doesFileExist f
   case z of
@@ -141,8 +143,11 @@ errorKillsForvoToggle = runError >=> \case
 
 runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
                                 , Input ResourceDirs
-                                , FBFileSystem
                                 , FSPKVStore
+                                , FSWrite
+                                , FSCopy
+                                , FSExist
+                                , FSDir
                                 , ForvoClient
                                 , State (Toggle ForvoEnabled)] m
                     => (Text -> Path Rel File)
@@ -159,12 +164,15 @@ runMultiClozeSpecIO f s (MultiClozeSpec p is) = do
           forM cs $ \t -> getForvo l t (audio </> f t)
       return $ genForvos bs is (map f cs)
 
-runPronunciationSpecIO :: Members '[ FBFileSystem
-                                   , Input ResourceDirs
+runPronunciationSpecIO :: Members '[Input ResourceDirs
                                    , Log (Msg Severity)
                                    , FSPKVStore
                                    , ForvoClient
                                    , State (Toggle ForvoEnabled)
+                                   , FSWrite
+                                   , FSCopy
+                                   , FSExist
+                                   , FSDir
                                    ] m
                         => PronunciationSpec
                         -> Sem m [RForvoNote]
@@ -179,7 +187,6 @@ runBasicReversed :: BasicReversedSpec -> Sem m RBasicReversedNoteVF
 runBasicReversed BasicReversedSpec{..} = return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
 
 runSomeSpec :: Members [ Log (Msg Severity)
-                       , FBFileSystem
                        , ClipProcess
                        , ForvoClient
                        , State (Toggle ForvoEnabled)
@@ -187,6 +194,11 @@ runSomeSpec :: Members [ Log (Msg Severity)
                        , Error SubtitleParseException
                        , Input ExportDirs
                        , YouTubeDL
+                       , FSTemp
+                       , FSExist
+                       , FSWrite
+                       , FSDir
+                       , FSCopy
                        , FSPKVStore] m => Spec -> Sem m [SomeNote]
 runSomeSpec p = case p of
       Excerpt xs         -> fmap SomeNote <$> (join <$> mapM runExcerptSpecIO xs)
@@ -195,12 +207,16 @@ runSomeSpec p = case p of
       BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs
 
 runMakeDeck :: Members [ Log (Msg Severity)
-                       , FBFileSystem
                        , ClipProcess
                        , ForvoClient
                        , State (Toggle ForvoEnabled)
                        , Error SubtitleParseException
                        , YouTubeDL
+                       , FSWrite
+                       , FSExist
+                       , FSTemp
+                       , FSDir
+                       , FSCopy
                        , FSPKVStore] m => Deck -> Sem m ()
 runMakeDeck Deck{..} = do
   let ExportDirs{..} = exportDirs
@@ -208,21 +224,25 @@ runMakeDeck Deck{..} = do
     runInputConst @ExportDirs exportDirs $
       forM_ parts \(Part out p) -> do
         x <- runSomeSpec p
-        writeFileUTF8 (notes </> out) $ T.intercalate "\n" $ renderNote <$> x
+        writeFileUtf8 (notes </> out) $ T.intercalate "\n" $ renderNote <$> x
 
 main :: IO ()
 main = do
    FlashBlastConfig{..} <- D.input D.auto "./index.dhall"
    logEnvStderr <- newLogEnv stderr
    x <- runM
-      . traceToIO
+      . runFSExistIO
+      . runFSReadIO
+      . runFSWriteIO
+      . runFSDirIO
+      . runFSTempIO
+      . runFSCopyIO
       . runLogAction (logTextStderr & cmap (renderThreadTimeMessage logEnvStderr))
       . addThreadAndTimeToLog
       . evalState @(Toggle ForvoEnabled) (Toggle True)
       . runError @SomeException
       . mapError @JSONParseException SomeException
       . mapError @SubtitleParseException SomeException
-      . interpretFBFileSystem
       . errorKillsForvoToggle @ForvoEnabled @JSONException
       . interpretFFMpegCli
       . interpretYouTubeDL
