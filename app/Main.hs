@@ -1,6 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
+import           Colog.Polysemy
+import           Colog.Polysemy.Formatting
 import           Composite.Record
 import qualified Data.Attoparsec.Text     as A
 import qualified Dhall                    as D
@@ -19,15 +21,16 @@ import           FlashBlast.ClozeParse
 import           FlashBlast.Config
 import           FlashBlast.FBFileSystem
 import           FlashBlast.Conventions
-import           FlashBlast.ForvoClient
+import           FlashBlast.ForvoClient hiding (id)
 import           FlashBlast.JSONFileStore
 import           FlashBlast.YouTubeDL
 import           Polysemy.State
 import           RIO                      hiding (Reader, ask, asks, log, many,
-                                           runReader, trace)
+                                           runReader, trace, logInfo)
 import           RIO.List
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
+import Formatting
 import qualified Text.Subtitles.SRT       as SR
 
 
@@ -89,30 +92,30 @@ instance Exception SubtitleParseException
 
 type FSPKVStore = KVStore (Locale, Text) ForvoStandardPronunciationResponseBody
 
-downloadMP3For :: Members [FSPKVStore, ForvoClient, Trace] r => Locale -> Text -> Sem r (Maybe ByteString)
-downloadMP3For l t = do
+downloadMP3For :: Members [FSPKVStore, ForvoClient, Log (Msg Severity)] r => Locale -> Text -> Sem r (Maybe ByteString)
+downloadMP3For l@(Locale l') t = do
   a <- lookupKV @(Locale, Text) @ForvoStandardPronunciationResponseBody (l, t)
   case a of
     Just x -> do
-      trace $ "Response for " <> show (l, t) <> " found in cache."
+      logInfo ("Response for " % accessed fst stext <> ", " % accessed snd stext % " found in cache.") (l', t)
       p x
     Nothing -> do
       x <- standardPronunciation l t
       updateKV @(Locale, Text) @ForvoStandardPronunciationResponseBody (l,t) $ Just x
       p x
   where
-    p :: Members '[ForvoClient, Trace] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
+    p :: Members '[ForvoClient] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
     p ForvoStandardPronunciationResponseBody{..} = case items of
       []      -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
-getForvo :: Members '[Trace, FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
+getForvo :: Members '[Log (Msg Severity), FBFileSystem, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
   z <- doesFileExist f
   case z of
-    True  -> trace $ show f <> " already exists in filesystem."
+    True  -> logInfo (accessed id stext % " found in filesystem.") (toFilePathText f)
     False -> do
-      trace $ show f <> " not found in filesystem."
+      logInfo (accessed id stext % " not found in filesystem.") (toFilePathText f)
       x <- downloadMP3For l t
       case x of
         Just x' -> do
@@ -128,16 +131,15 @@ data ToggleKilled a = ToggleKilled
 
 data ForvoEnabled
 
-errorKillsForvoToggle :: forall a e r b. Members '[State (Toggle a), Trace] r => Sem (Error e ': r) b -> Sem r ()
+errorKillsForvoToggle :: forall a e r b. Members '[State (Toggle a), Log (Msg Severity)] r => Sem (Error e ': r) b -> Sem r ()
 errorKillsForvoToggle = runError >=> \case
     Left _ -> do
-      trace $ "Something went wrong with forvo. Turning forvo off for remainer of run."
+      logInfo $ "Something went wrong with forvo. Turning forvo off for remainer of run."
       put @(Toggle a) $ Toggle False
     Right _ -> return ()
 
 
-runMultiClozeSpecIO :: Members '[
-                                 Trace
+runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
                                 , Input ResourceDirs
                                 , FBFileSystem
                                 , FSPKVStore
@@ -158,8 +160,8 @@ runMultiClozeSpecIO f s (MultiClozeSpec p is) = do
       return $ genForvos bs is (map f cs)
 
 runPronunciationSpecIO :: Members '[ FBFileSystem
-                                   , Trace
                                    , Input ResourceDirs
+                                   , Log (Msg Severity)
                                    , FSPKVStore
                                    , ForvoClient
                                    , State (Toggle ForvoEnabled)
@@ -176,7 +178,7 @@ runMinimalReversed MinimalReversedSpec{..} = return $ val @"from" from :& val @"
 runBasicReversed :: BasicReversedSpec -> Sem m RBasicReversedNoteVF
 runBasicReversed BasicReversedSpec{..} = return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
 
-runSomeSpec :: Members [ Trace
+runSomeSpec :: Members [ Log (Msg Severity)
                        , FBFileSystem
                        , ClipProcess
                        , ForvoClient
@@ -192,8 +194,7 @@ runSomeSpec p = case p of
       MinimalReversed xs -> mapM (fmap SomeNote . runMinimalReversed) xs
       BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs
 
-runMakeDeck :: Members [
-                        Trace
+runMakeDeck :: Members [ Log (Msg Severity)
                        , Error JSONException
                        , FBFileSystem
                        , ClipProcess
@@ -214,8 +215,11 @@ runMakeDeck Deck{..} = do
 main :: IO ()
 main = do
    FlashBlastConfig{..} <- D.input D.auto "./index.dhall"
+   logEnvStderr <- newLogEnv stderr
    x <- runM
       . traceToIO
+      . runLogAction (logTextStderr & cmap (renderThreadTimeMessage logEnvStderr))
+      . addThreadAndTimeToLog
       . evalState @(Toggle ForvoEnabled) (Toggle True)
       . runError @SomeException
       . mapError @JSONParseException SomeException
