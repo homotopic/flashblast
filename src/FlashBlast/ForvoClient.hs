@@ -104,12 +104,31 @@ data ForvoLimitText = ForvoLimitText
 instance FromJSON ForvoLimitText where
   parseJSON = withText "ForvoLimitText" $ \case
     "Limit/day reached." -> return ForvoLimitText
-    _ -> fail "Unknown response"
+    _ -> fail "Unknown response."
 
 data ForvoLimitResponse = ForvoLimitResponse [ForvoLimitText]
   deriving Generic
 
 instance FromJSON ForvoLimitResponse
+
+data ForvoAPIKeyIncorrectException = ForvoAPIKeyIncorrectException
+  deriving (Eq, Show, Generic)
+
+instance Exception ForvoAPIKeyIncorrectException where
+  displayException = show
+
+data ForvoIncorrectDomainText = ForvoIncorrectDomainText
+  deriving (Eq, Show, Generic)
+
+instance FromJSON ForvoIncorrectDomainText where
+  parseJSON = withText "ForvoIncorrectDomainText" $ \case
+    "Calling from incorrect domain." -> return ForvoIncorrectDomainText
+    _ -> fail "Unknown response."
+
+data ForvoIncorrectDomainResponse = ForvoIncorrectDomainResponse [ForvoIncorrectDomainText]
+  deriving Generic
+
+instance FromJSON ForvoIncorrectDomainResponse
 
 data ForvoResponseNotUnderstood = ForvoResponseNotUnderstood ByteString
   deriving (Show, Eq, Generic)
@@ -150,13 +169,25 @@ throwIfLimitReached z = let (z' :: Either String ForvoLimitResponse) = eitherDec
                           Left _  -> return z
                           Right _ -> throw ForvoLimitReachedException
 
-interpretForvoClient :: Members '[RemoteHttpRequest] r => Sem (ForvoClient ': r) a -> Sem (Input ForvoAPIKey ': Error ForvoLimitReachedException ': Error ForvoResponseNotUnderstood ': r) a
-interpretForvoClient = reinterpret3 \case
+throwIfIncorrectDomain :: Member (Error ForvoAPIKeyIncorrectException) r => ByteString -> Sem r ByteString
+throwIfIncorrectDomain z = let (z' :: Either String ForvoIncorrectDomainResponse) = eitherDecodeStrict z
+                        in case z' of
+                          Left _  -> return z
+                          Right _ -> throw ForvoAPIKeyIncorrectException
+
+
+interpretForvoClient :: Members '[ RemoteHttpRequest
+                                 , Input ForvoAPIKey
+                                 , Error ForvoLimitReachedException
+                                 , Error ForvoAPIKeyIncorrectException
+                                 , Error ForvoResponseNotUnderstood] r => Sem (ForvoClient ': r) a -> Sem r a
+interpretForvoClient = interpret \case
   StandardPronunciation (Locale l) t -> do
     ForvoAPIKey f <- input @ForvoAPIKey
     let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/standard-pronunciation/word/" <> t <> "/language/" <> l
     z <- requestBS k
     _ <- throwIfLimitReached z
+    _ <- throwIfIncorrectDomain z
     let (y' :: Either String ForvoStandardPronunciationResponseBody) = eitherDecodeStrict z
     case y' of
       Left _ -> throw @ForvoResponseNotUnderstood (ForvoResponseNotUnderstood z)
@@ -166,6 +197,7 @@ interpretForvoClient = reinterpret3 \case
     let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/language-list/order/name"
     z <- requestBS k
     _ <- throwIfLimitReached z
+    _ <- throwIfIncorrectDomain z
     let (y' :: Either String ForvoLanguageListResponseBody) = eitherDecodeStrict z
     case y' of
       Left _ -> throw @ForvoResponseNotUnderstood (ForvoResponseNotUnderstood z)

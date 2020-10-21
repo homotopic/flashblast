@@ -279,6 +279,7 @@ main = do
       . mapError @BadRequestException SomeException
       . interpretRemoteHttpRequest
       . mapError @ForvoResponseNotUnderstood SomeException
+      . mapError @ForvoAPIKeyIncorrectException SomeException
       . errorKillsToggle @ForvoEnabled @ForvoLimitReachedException
       . runInputConst @ForvoAPIKey (maybe (ForvoAPIKey "") RIO.id forvoApiKey)
       . interpretForvoClient
