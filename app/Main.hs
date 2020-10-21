@@ -36,6 +36,7 @@ import           RIO.List
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
 import Formatting
+import Formatting.Time
 import qualified Text.Subtitles.SRT       as SR
 
 fromTime :: SR.Time -> Time
@@ -154,14 +155,19 @@ forvoToggleKilledLogInfo :: Members '[Log (Msg Severity)] r => Sem (Log (ToggleK
 forvoToggleKilledLogInfo = interpret \case
   Log x -> logInfo "Something went wrong with Forvo. Turning Forvo Off for remainer of run."
 
+fIso8601 :: FormatTime a => (Color -> Builder -> Builder) -> Format r (a -> r)
+fIso8601 withFG = later $ \time -> mconcat
+  [ bformat dateDash time
+  , withFG Green "T"
+  , withFG Yellow $ bformat hms time
+  ]
 
 renderThreadTimeMessage' :: LogEnv -> ThreadTimeMessage -> T.Text
 renderThreadTimeMessage' (LogEnv useColor zone) (ThreadTimeMessage threadId time (Msg severity stack message)) =
   let withFG = getWithFG useColor
   in sformat (fFieldsGreenBarSep useColor)
     [ bformat (fSeverity withFG) severity
-    , bformat (fIso8601Tz withFG) (utcToZonedTime zone time)
-    , bformat fThread threadId
+    , bformat (fIso8601 withFG) (utcToZonedTime zone time)
     , bformat stext message
     ]
 
