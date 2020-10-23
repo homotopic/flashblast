@@ -12,6 +12,7 @@ extra-source-files:
 - ChangeLog.md
 
 default-extensions:
+- AllowAmbiguousTypes
 - BangPatterns
 - BinaryLiterals
 - BlockArguments
@@ -75,8 +76,10 @@ dependencies:
 - polysemy-plugin
 - polysemy-video >= 0.1.1.0
 - polysemy-zoo
+- relude
 - rio
 - semialign
+- optics
 - subtitleParser
 - temporary
 - text

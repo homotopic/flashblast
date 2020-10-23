@@ -106,6 +106,9 @@ instance FromJSON ForvoLimitText where
     "Limit/day reached." -> return ForvoLimitText
     _ -> fail "Unknown response."
 
+instance Exception ForvoLimitReachedException where
+  displayException = show
+
 data ForvoLimitResponse = ForvoLimitResponse [ForvoLimitText]
   deriving Generic
 
@@ -146,8 +149,8 @@ deriving instance Show BadRequestException
 instance Exception BadRequestException where
   displayException = show
 
-interpretRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error BadRequestException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
-interpretRemoteHttpRequest = interpret \case
+runRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error BadRequestException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
+runRemoteHttpRequest = interpret \case
   RequestJSON x -> do
     let k = parseRequestThrow $ T.unpack x
     case k of
@@ -176,12 +179,12 @@ throwIfIncorrectDomain z = let (z' :: Either String ForvoIncorrectDomainResponse
                           Right _ -> throw ForvoAPIKeyIncorrectException
 
 
-interpretForvoClient :: Members '[ RemoteHttpRequest
-                                 , Input ForvoAPIKey
-                                 , Error ForvoLimitReachedException
-                                 , Error ForvoAPIKeyIncorrectException
-                                 , Error ForvoResponseNotUnderstood] r => Sem (ForvoClient ': r) a -> Sem r a
-interpretForvoClient = interpret \case
+runForvoClient :: Members '[ RemoteHttpRequest
+                           , Input ForvoAPIKey
+                           , Error ForvoLimitReachedException
+                           , Error ForvoAPIKeyIncorrectException
+                           , Error ForvoResponseNotUnderstood] r => Sem (ForvoClient ': r) a -> Sem r a
+runForvoClient = interpret \case
   StandardPronunciation (Locale l) t -> do
     ForvoAPIKey f <- input @ForvoAPIKey
     let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/standard-pronunciation/word/" <> t <> "/language/" <> l

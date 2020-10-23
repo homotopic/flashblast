@@ -23,36 +23,34 @@ data VF = Empty | Raw Text | Images [Path Rel File] | Audio (Path Rel File)
 instance FromDhall VF
 
 withLensesAndProxies [d|
-  type FFront a     = "front" :-> a
-  type FExtra a     = "extra" :-> a
-  type FBack a      = "back"  :-> a
-  type FFrom a      = "from" :-> a
-  type FFromExtra a = "from-extra" :-> a
-  type FTo a        = "to" :-> a
-  type FToExtra a   = "to-extra" :-> a
-  type FAudio1      = "audio1" :-> Maybe (Path Rel File)
-  type FAudio2      = "audio2" :-> Maybe (Path Rel File)
-  type FAudio3      = "audio3" :-> Maybe (Path Rel File)
-  type FAudio4      = "audio4" :-> Maybe (Path Rel File)
-  type FAudio5      = "audio5" :-> Maybe (Path Rel File)
-  type FAudio6      = "audio6" :-> Maybe (Path Rel File)
-  type FAudio7      = "audio7" :-> Maybe (Path Rel File)
-  type FAudio8      = "audio8" :-> Maybe (Path Rel File)
-  type FAudio9      = "audio9" :-> Maybe (Path Rel File)
-  type FAudio10     = "audio10" :-> Maybe (Path Rel File)
-  type FAudio11     = "audio11" :-> Maybe (Path Rel File)
-  type FAudio12     = "audio12" :-> Maybe (Path Rel File)
-  type FAudio13     = "audio13" :-> Maybe (Path Rel File)
-  type FAudio14     = "audio14" :-> Maybe (Path Rel File)
-  type FAudio15     = "audio15" :-> Maybe (Path Rel File)
-  type FAudio16     = "audio16" :-> Maybe (Path Rel File)
+  type FFront a      = "front" :-> a
+  type FExtra a      = "extra" :-> a
+  type FBack a       = "back"  :-> a
+  type FFrontExtra a = "front-extra" :-> a
+  type FBackExtra a    = "back-extra" :-> a
+  type FAudio1       = "audio1" :-> Maybe (Path Rel File)
+  type FAudio2       = "audio2" :-> Maybe (Path Rel File)
+  type FAudio3       = "audio3" :-> Maybe (Path Rel File)
+  type FAudio4       = "audio4" :-> Maybe (Path Rel File)
+  type FAudio5       = "audio5" :-> Maybe (Path Rel File)
+  type FAudio6       = "audio6" :-> Maybe (Path Rel File)
+  type FAudio7       = "audio7" :-> Maybe (Path Rel File)
+  type FAudio8       = "audio8" :-> Maybe (Path Rel File)
+  type FAudio9       = "audio9" :-> Maybe (Path Rel File)
+  type FAudio10      = "audio10" :-> Maybe (Path Rel File)
+  type FAudio11      = "audio11" :-> Maybe (Path Rel File)
+  type FAudio12      = "audio12" :-> Maybe (Path Rel File)
+  type FAudio13      = "audio13" :-> Maybe (Path Rel File)
+  type FAudio14      = "audio14" :-> Maybe (Path Rel File)
+  type FAudio15      = "audio15" :-> Maybe (Path Rel File)
+  type FAudio16      = "audio16" :-> Maybe (Path Rel File)
   |]
 
 type RBasicNote a b c = Record (FFront a : FExtra b : FBack c : '[])
 
-type RBasicReversedNote a b c d = Record (FFrom a : FFromExtra b : FTo c : FToExtra d : '[])
+type RBasicReversedNote a b c d = Record (FFront a : FFrontExtra b : FBack c : FBackExtra d : '[])
 
-type RMinimalNote a b = Record (FFrom a : FTo b : '[])
+type RMinimalNote a b = Record (FFront a : FBack b : '[])
 
 type RMultiAudioNote a b = Record (FFront a : FExtra b : FAudio1 : FAudio2 : FAudio3 : FAudio4 : FAudio5 : FAudio6 : FAudio7 : FAudio8 : FAudio9 : FAudio10 : FAudio11 : FAudio12 : FAudio13 : FAudio14 : FAudio15 : FAudio16 : '[])
 

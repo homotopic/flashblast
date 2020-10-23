@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 
 import           Colog.Polysemy
+import FlashBlast.Domain
 import RIO.Time
 import Colog.Polysemy.Formatting.LogEnv
 import Colog.Polysemy.Formatting.ThreadTimeMessage
@@ -13,6 +14,7 @@ import           Composite.Record
 import qualified Data.Attoparsec.Text     as A
 import qualified Dhall                    as D
 import           Network.HTTP.Simple
+import Polysemy.Output
 import           Path
 import           Path.Dhall               ()
 import           Path.Utils
@@ -20,25 +22,27 @@ import           Polysemy
 import           Polysemy.Error           as P
 import           Polysemy.Input
 import           Polysemy.KVStore
-import           Polysemy.Video
+import           Polysemy.Video hiding (to)
 
 import           FlashBlast.ClozeParse
-import           FlashBlast.Config hiding (format)
+import qualified FlashBlast.Config as Config
 import           FlashBlast.FS
 import           FlashBlast.Conventions
 import           FlashBlast.ForvoClient hiding (id)
 import           FlashBlast.JSONFileStore
 import           FlashBlast.YouTubeDL
 import           Polysemy.State
-import           RIO                      hiding (Reader, ask, asks, log, many,
-                                           runReader, trace, logInfo, writeFileUtf8, Builder)
 import           RIO.List
+import RIO hiding(view, to, Builder, logInfo)
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
-import Formatting
-import Formatting.Time
+--import Formatting
+--import Formatting.Time
+import Polysemy.Tagged
 import qualified Text.Subtitles.SRT       as SR
+import Optics
 
+{--
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
 
@@ -53,7 +57,7 @@ fFieldsGreenBarSep useColor = later $ \fields ->
 
 interpretVideoSource :: Members '[Input ResourceDirs, YouTubeDL] m => VideoSource -> Sem m (Path Rel File)
 interpretVideoSource = \case
-  YouTubeDL (YDLInfo x y f) -> do
+  Dhall.YouTubeDL (YDLInfo x y f) -> do
     ResourceDirs{..} <- input @ResourceDirs
     youTubeDL' x (video </> y) f
     return (video </> y)
@@ -123,7 +127,11 @@ downloadMP3For l@(Locale l') t = do
       []      -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
-getForvo :: Members '[Log (Msg Severity), FSKVStore Rel, FSPKVStore, ForvoClient] r => Locale -> Text -> Path Rel File -> Sem r ()
+getForvo :: Members '[ Log (Msg Severity)
+                     , FSKVStore Rel
+                     , FSPKVStore
+                     , ForvoClient] r
+         => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
   z <- lookupKV f
   case z of
@@ -140,17 +148,6 @@ data ToggleKilled a = ToggleKilled
 
 data ForvoEnabled
 
-errorKillsToggle :: forall a e r b. Members '[State (Toggle a), Log (ToggleKilled a)] r => Sem (Error e ': r) b -> Sem r ()
-errorKillsToggle = runError >=> \case
-    Left _ -> do
-      log @(ToggleKilled a) ToggleKilled
-      put @(Toggle a) $ Toggle False
-    Right _ -> return ()
-
-forvoToggleKilledLogInfo :: Members '[Log (Msg Severity)] r => Sem (Log (ToggleKilled ForvoEnabled) ': r) a -> Sem r a
-forvoToggleKilledLogInfo = interpret \case
-  Log x -> logInfo "Something went wrong with Forvo. Turning Forvo Off for remainer of run."
-
 fIso8601 :: FormatTime a => (Color -> Builder -> Builder) -> Format r (a -> r)
 fIso8601 withFG = later $ \time -> mconcat
   [ bformat dateDash time
@@ -166,7 +163,8 @@ renderThreadTimeMessage' (LogEnv useColor zone) (ThreadTimeMessage threadId time
     , bformat (fIso8601 withFG) (utcToZonedTime zone time)
     , bformat stext message
     ]
-
+--}
+{--
 runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
                                 , Input ResourceDirs
                                 , FSPKVStore
@@ -174,21 +172,15 @@ runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
                                 , FSRead
                                 , FSExist
                                 , FSDir
-                                , ForvoClient
-                                , State (Toggle ForvoEnabled)] m
+                                , ForvoClient] m
                     => (Text -> Path Rel File)
                     -> Maybe ForvoSpec
                     -> MultiClozeSpec
                     -> Sem m [RForvoNote]
 runMultiClozeSpecIO f s (MultiClozeSpec p is) = do
     ResourceDirs{..} <- input @ResourceDirs
-    runFSKVStoreRelIn audio $  forM p \a -> do
-      let (bs, cs) = genClozePhrase a
-      Toggle k <- get @(Toggle ForvoEnabled)
-      when k $ do
-        forM_ s $ \(ForvoSpec l) ->
-          forM cs $ \t -> getForvo l t (f t)
-      return $ genForvos bs is (map f cs)
+    forM p \a -> let (bs, cs) = genClozePhrase a
+                 in genForvos bs is (map f cs)
 
 runPronunciationSpecIO :: Members '[Input ResourceDirs
                                    , Log (Msg Severity)
@@ -206,11 +198,7 @@ runPronunciationSpecIO (PronunciationSpec f ms a) = do
                                                      zs <- forM ms $ runMultiClozeSpecIO f a
                                                      return $ join zs
 
-runMinimalReversed :: MinimalReversedSpec -> Sem m RMinimalNoteVF
-runMinimalReversed MinimalReversedSpec{..} = return $ val @"from" from :& val @"to" to :& RNil
 
-runBasicReversed :: BasicReversedSpec -> Sem m RBasicReversedNoteVF
-runBasicReversed BasicReversedSpec{..} = return $ val @"from" from :& val @"from-extra" from_extra :& val @"to" to :& val @"to-extra" to_extra :& RNil
 
 runSomeSpec :: Members [ Log (Msg Severity)
                        , ClipProcess
@@ -253,7 +241,7 @@ runMakeDeck Deck{..} = do
       forM_ parts \(Part out p) -> do
         x <- runSomeSpec p
         writeFileUtf8 (notes </> out) $ T.intercalate "\n" $ renderNote <$> x
-
+--}
 type FSKVStore b = KVStore (Path b File) ByteString
 
 runFSKVStoreRelIn :: Members '[FSExist, FSRead, FSWrite, FSDir] r => Path b Dir -> Sem (FSKVStore Rel ': r) a -> Sem r a
@@ -270,29 +258,153 @@ runFSKVStoreRelIn d = interpret \case
       Nothing -> pure ()
       Just x  -> writeFileBS (d </> k) x
 
+{--
 data PronunciationDictionary m a where
-  DiscoverClozePhrases :: PronunciationSpec -> PronunciationDictionary m [(Locale, Text)]
-  DoesClozeFileExist   :: (Locale, Text) -> PronunciationDictionary m Bool
-  FetchClozeFile       :: (Locale, Text) -> PronunciationDictionary m ByteString
-  PlaceClozeFile       :: (Locale, Text) -> ByteString -> PronunciationDictionary m ()
+  DiscoverClozePhrases       :: MultiClozeSpec -> PronunciationDictionary m [(Locale, Text)]
+  DoesPronunciationFileExist :: (Locale, Text) -> PronunciationDictionary m Bool
+  FetchPronunciationData     :: (Locale, Text) -> PronunciationDictionary m ByteString
+  WritePronunciationData     :: (Locale, Text) -> ByteString -> PronunciationDictionary m ()
 
 makeSem ''PronunciationDictionary
 
-{--
-f :: Members '[PronunciationDictionary] r => PronunciationSpec -> Sem r ()
-f x = do
+fillPronunciationDictionary :: Members '[PronunciationDictionary] r => PronunciationSpec -> Sem r ()
+filPronunciationDictionary  = do
   zs <- discoverClozePhrases x
   forM zs $ \z -> do
-    x <- doesClozeFileExist z
+    x <- doesPronunciationFileExist z
+    case x of
+      True  -> return ()
+      False -> do
+        y <- fetchPronunciationData z
+        writePronunciationData z
 --}
 
+{-
+extractClozes :: Text -> [Text]
+extractClozes = snd . genClozePhrase
 
+getForvoPrep :: Deck -> [(ForvoSpec, (Text -> Path Rel File), [Text])]
+getForvoPrep (Deck{..}) = join $ map (\x ->
+  case x of
+    Pronunciation (PronunciationSpec f ms (Just z)) -> [(z, f, join $ map extractClozes (join $ map phrases ms))]
+    _ -> []
+  ) (map spec parts)
+
+hotKVStore :: forall t t' k v r. Members '[Input k, Tagged t (KVStore k v), Tagged t' (KVStore k v)] r => Sem r ()
+hotKVStore = do
+  a <- input @k
+  z <- tag @t @(KVStore k v) $ existsKV @k @v a
+  if z
+    then return ()
+  else
+    do
+      x <- tag @t' @(KVStore k v) $ lookupKV @k @v a
+      case x of
+        Nothing -> return ()
+        Just x' -> tag @t @(KVStore k v) $ writeKV @k @v a x'
+--}
+runKVStoreAsKVStore :: forall k v k' v' r a. Getter k k' -> Iso' v v' -> Sem (KVStore k v ': r) a -> Sem (KVStore k' v' ': r) a
+runKVStoreAsKVStore f g = reinterpret \case
+  LookupKV k   -> fmap (review g) <$> lookupKV @k' @v' (view f k)
+  UpdateKV k x -> updateKV @k' @v' (view f k) (fmap (view g) x)
+
+data Deck = Deck {
+  notes :: [Path Rel File]
+, media :: [Path Rel File]
+} deriving (Eq, Show, Generic)
+
+generateMinimalReversedNoteVF :: Config.MinimalReversedCard -> RMinimalNoteVF
+generateMinimalReversedNoteVF Config.MinimalReversedCard{..} = val @"front" _front
+                                                            :& val @"back"  _back
+                                                            :& RNil
+
+generateBasicReversedNoteVF :: Config.BasicReversedCard -> RBasicReversedNoteVF
+generateBasicReversedNoteVF Config.BasicReversedCard{..} = val @"front"       _front
+                                                        :& val @"front-extra" _front_extra
+                                                        :& val @"back"        _back
+                                                        :& val @"back-extra"  _back_extra
+                                                        :& RNil
+
+makeDeck :: Members '[] r
+         => Config.Deck
+         -> Sem r Deck
+makeDeck x = do
+  let f = itoListOf
+            ( Config.parts
+            % itraversed
+            % Config.spec
+            % Config._Pronunciation
+            % Config.multis
+            % traversed
+            % Config.phrases
+            ) x
+  let a = itoListOf
+            ( Config.parts
+            % itraversed
+            % Config.spec
+            % Config._BasicReversed
+            ) x
+  return $ Deck [] []
+
+--}
+{--
+live :: (Text -> Path Rel File) -> IO ()
+live f = hotKVStore @"local" @"remote" @Text @ByteString
+          & untag @"local" @(KVStore Text ByteString)
+          & runKVStoreAsKVStore @Text @ByteString @(Path Rel File) @ByteString (to f) (iso id id)
+          & runFSKVStoreRelIn $(mkRelDir "foo")
+          & untag @"remote" @(KVStore Text ByteString)
+          & runForvoClient
+          & runError @ForvoAPIKeyIncorrectException
+          & runError @ForvoLimitReachedException
+          & runError @ForvoResponseNotUnderstood
+          & runRemoteHttpRequest
+          & runError @JSONException
+          & runError @BadRequestException
+          & runInputConst
+          & runFSReadIO
+          & runFSWriteIO
+          & runFSExistIO
+          & runFSDirIO
+          & runFSTempIO
+          & runM
+
+test :: IO ()
+test = hotKVStore @"foo" @"bar" @Char @Int
+        & runInputConst @Char 'a'
+        & untag @"bar" @(KVStore Char Int)
+        & runKVStoreAsState
+        & evalState (Map.fromList [('a', 1)])
+        & untag @"foo" @(KVStore Char Int)
+        & runKVStoreAsState
+        & evalState (Map.fromList [])
+        & runM
+--}
+--
+main :: IO ()
+main = flashblast @Config.Deck @Deck makeDeck
+        & untag @DeckConfiguration
+        & runInputConst (Config.Deck { })
+--        & runKVStoreAsState @(Locale, Text) @(Path Rel File)
+  --      & evalState (Map.fromList [])
+        & untag @CollectionsPackage
+        & runOutputSem (embed . traceShowM)
+        & runM
+{--
 main :: IO ()
 main = do
    FlashBlastConfig{..} <- D.input D.auto "./index.dhall"
    logEnvStderr <- newLogEnv stderr
    let logT = logTextStderr & cmap (renderThreadTimeMessage' logEnvStderr)
-   x <- runM
+   runM $ do
+     x <- runError @ForvoLimitReachedException
+        . runInputConst @ForvoAPIKey (maybe (ForvoAPIKey "") RIO.id forvoApiKey)
+        . interpretForvoClient
+        $ forM (Map.toList $ decks) $ \(n, x@Deck{..}) -> do
+            let x' = getForvoPrep x
+            forM x' $ \(ForvoSpec{..}, f, zs) -> forM zs $ \t -> getForvo locale t (f t)
+{--   x <- runM
+      . evalState @(Toggle ForvoEnabled) (Toggle True)
       . runFSExistIO
       . runFSReadIO
       . runFSWriteIO
@@ -301,10 +413,8 @@ main = do
       . runFSCopyIO
       . runLogAction  logT
       . addThreadAndTimeToLog
-      . forvoToggleKilledLogInfo
       . mapLog (logInfo' . fileExistsLogText)
       . logFileExists
-      . evalState @(Toggle ForvoEnabled) (Toggle True)
       . runError @SomeException
       . mapError @JSONParseException SomeException
       . mapError @SubtitleParseException SomeException
@@ -317,10 +427,9 @@ main = do
       . interpretRemoteHttpRequest
       . mapError @ForvoResponseNotUnderstood SomeException
       . mapError @ForvoAPIKeyIncorrectException SomeException
-      . errorKillsToggle @ForvoEnabled @ForvoLimitReachedException
-      . runInputConst @ForvoAPIKey (maybe (ForvoAPIKey "") RIO.id forvoApiKey)
-      . interpretForvoClient
-      $ mapM_ runMakeDeck $ fmap snd . Map.toList $ decks
-   case x of
-     Left e -> throwIO e
-     Right x' -> return x'
+      . mapError @ForvoLimitReachedException SomeException
+      $ mapM_ runMakeDeck $ fmap snd . Map.toList $ decks--}
+     case x of
+       Left e -> throwIO e
+       Right x' -> return x'
+       --}
