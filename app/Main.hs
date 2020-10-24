@@ -23,6 +23,7 @@ import           Polysemy
 import           Polysemy.Error           as P
 import           Polysemy.Input
 import           Polysemy.KVStore
+import Polysemy.Several
 import           Polysemy.Video hiding (to)
 
 import FlashBlast.KVStore
@@ -226,11 +227,6 @@ generateBasicReversedNoteVF Config.BasicReversedCard{..} = val @"front"       _f
                                                         :& val @"back-extra"  _back_extra
                                                         :& RNil
 
-writeRenderedNote :: (Member FSWrite m, RenderNote a) => Path Rel File -> [a] -> Sem m Deck
-writeRenderedNote x a = do
-  writeFileUtf8 x . T.intercalate "\n" . fmap renderNote $ a
-  return $ Deck [x] []
-
 extractRelevantParts :: Prism' Config.Spec x -> Config.Deck -> Map (Path Rel File) x
 extractRelevantParts x = Map.fromList . itoListOf
                            ( Config.parts
@@ -240,39 +236,43 @@ extractRelevantParts x = Map.fromList . itoListOf
                            % x
                            )
 
-makeSubDeck :: Config.Deck -> Prism' Config.Spec b -> (Path Rel File -> b -> Sem r Deck) -> Sem r Deck
-makeSubDeck x p r = fmap mconcat <$> mapM (uncurry r) $ Map.toList (extractRelevantParts p x)
+decomposeDeckConfig :: Config.Deck -> HList '[ Map (Path Rel File) [Config.MinimalReversedCard]
+                                             , Map (Path Rel File) [Config.BasicReversedCard]
+                                             , Map (Path Rel File) [Config.ExcerptSpec]
+                                             , Map (Path Rel File) [Config.PronunciationSpec]
+                                             ]
+decomposeDeckConfig x = extractRelevantParts Config._MinimalReversed x
+                    ::: extractRelevantParts Config._BasicReversed   x
+                    ::: extractRelevantParts Config._Excerpt         x
+                    ::: extractRelevantParts Config._Pronunciation   x
+                    ::: HNil
 
-makeDeck :: Members '[ FSWrite
-                     , FSDir
-                     , FSRead
-                     , FSExist
-                     , FSTemp
-                     , FSCopy
-                     , Error SubtitleParseException
-                     , ClipProcess
-                     , YouTubeDL] r
-         => Config.Deck
-         -> Sem r Deck
-makeDeck x = runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
-           . runInputConst @Config.ExportDirs   (view Config.exportDirs   x)
-           $ do
-  let o' = x ^. Config.exportDirs % Config.notes
-  as <- makeSubDeck x Config._BasicReversed   $ \x y -> writeRenderedNote (o' </> x) (fmap generateBasicReversedNoteVF y)
-  bs <- makeSubDeck x Config._MinimalReversed $ \x y -> writeRenderedNote (o' </> x) (fmap generateMinimalReversedNoteVF y)
-  cs <- makeSubDeck x Config._Excerpt         $ \x y -> mapM runExcerptSpecIO y >>= writeRenderedNote (o' </> x) . join
-  ds <- makeSubDeck x Config._Pronunciation   $ \x y -> runPronunciationSpecIO y >>= writeRenderedNote (o' </> x)
-  return $ as <> bs
+makeSubDeck' :: (Members '[Input Config.ExportDirs, FSWrite] r, RenderNote a) => (b -> Sem r [a]) -> Map (Path Rel File) [b] -> Sem r Deck
+makeSubDeck' r x = do
+  Config.ExportDirs{..} <- input @Config.ExportDirs
+  (x' :: Map (Path Rel File) [a]) <- mapM (mapM r) x
+  forM (Map.toList x') $ \(f, (ks :: [a])) ->
+    writeFileUtf8 (_notes </> f) . T.intercalate "\n" . join . fmap (fmap renderNote) $ (ks :: [a])
+  return $ Deck (Map.keys x') []
 
 main :: IO ()
 main = do
-  Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
+  Config.FlashBlast{..} <- D.input auto "./index.dhall"
   forM_ _decks $ \x -> do
-    flashblast @Config.Deck @Deck makeDeck
+    flashblast @Config.Deck @Deck
         & untag @DeckConfiguration
         & runInputConst x
         & untag @CollectionsPackage
         & runOutputSem (embed . traceShowM)
+        & untag @ConstructionMethodology
+        & cmapMethodology decomposeDeckConfig
+        & runSubMethodology (makeSubDeck' $ pure . pure . generateMinimalReversedNoteVF)
+        & runSubMethodology (makeSubDeck' $ pure . pure . generateBasicReversedNoteVF)
+        & runSubMethodology (makeSubDeck' $ runExcerptSpecIO)
+        & runSubMethodology (makeSubDeck' $ runPronunciationSpecIO)
+        & endMethodology
+        & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
+        & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
         & runFSWriteIO
         & runFSDirIO
         & runFSCopyIO

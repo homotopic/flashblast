@@ -4,6 +4,7 @@
 module FlashBlast.Config where
 
 import qualified Dhall                  as D
+import qualified Dhall.Deriving         as D
 import           FlashBlast.Conventions
 import           FlashBlast.ForvoClient
 import           Path
@@ -14,38 +15,38 @@ import           RIO
 data MultiClozeSpec = MultiClozeSpec {
   _phrases :: [Text]
 , _images  :: [Path Rel File]
-} deriving (Eq, Generic, Show)
+} deriving stock (Eq, Generic, Show)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) MultiClozeSpec
 
 makeFieldsNoPrefix ''MultiClozeSpec
-
-instance D.FromDhall MultiClozeSpec
 
 data YDLInfo = YDLInfo {
   _url    :: Text
 , _out    :: Path Rel File
 , _format :: Text
-} deriving (Eq, Generic, Show)
+} deriving stock (Eq, Generic, Show)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) YDLInfo
 
 makeFieldsNoPrefix ''YDLInfo
-
-instance D.FromDhall YDLInfo
 
 data ResourceDirs = ResourceDirs {
   _audio  :: Path Rel Dir
 , _video  :: Path Rel Dir
 , _images :: Path Rel Dir
-} deriving (Eq, Show, Generic)
+} deriving stock (Eq, Generic, Show)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) ResourceDirs
 
 makeFieldsNoPrefix ''ResourceDirs
 
-instance D.FromDhall ResourceDirs
-
 data VideoSource = LocalVideo (Path Rel File) | YouTubeDL YDLInfo
-  deriving (Eq, Generic, Show)
+  deriving stock (Eq, Generic, Show)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) VideoSource
 
 makePrisms ''VideoSource
-
-instance D.FromDhall VideoSource
 
 data ExcerptSpec = ExcerptSpec {
   _source :: VideoSource
@@ -53,34 +54,38 @@ data ExcerptSpec = ExcerptSpec {
 , _clipf  :: Text -> Path Rel File
 , _audiof :: Text -> Path Rel File
 , _framef :: Text -> Path Rel File
-} deriving Generic
+} deriving stock Generic
+  deriving D.FromDhall
+    via D.Codec (D.Field (D.DropPrefix "_")) ExcerptSpec
 
 makeFieldsNoPrefix ''ExcerptSpec
-
-instance D.FromDhall ExcerptSpec
 
 data ExportDirs = ExportDirs {
   _audio  :: Path Rel Dir
 , _clips  :: Path Rel Dir
 , _images :: Path Rel Dir
 , _notes  :: Path Rel Dir
-} deriving (Eq, Show, Generic)
+} deriving stock (Eq, Generic, Show)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) ExportDirs
 
 makeFieldsNoPrefix ''ExportDirs
-
-instance D.FromDhall ExportDirs
 
 newtype Speaker = Speaker Text
   deriving (Eq, Show, Generic)
 
+instance D.FromDhall Locale
+instance D.ToDhall Locale
+
 instance D.FromDhall Speaker
+instance D.ToDhall Speaker
 
 data ForvoSpec = ForvoSpec {
   _locale            :: Locale
 , _preferredspeakers :: [Speaker]
-} deriving (Eq, Show, Generic)
-
-instance D.FromDhall ForvoSpec
+} deriving stock (Eq, Generic, Show)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) ForvoSpec
 
 makeFieldsNoPrefix ''ForvoSpec
 
@@ -88,44 +93,42 @@ data PronunciationSpec = PronunciationSpec {
   _audiof  :: Text -> Path Rel File
 , _multis :: [MultiClozeSpec]
 , _forvo  :: Maybe ForvoSpec
-} deriving Generic
+} deriving stock Generic
+  deriving D.FromDhall
+    via D.Codec (D.Field (D.DropPrefix "_")) PronunciationSpec
 
 makeFieldsNoPrefix ''PronunciationSpec
-
-instance D.FromDhall PronunciationSpec
 
 data BasicReversedCard = BasicReversedCard {
   _front       :: VF
 , _front_extra :: VF
 , _back        :: VF
 , _back_extra  :: VF
-} deriving (Eq, Show, Generic)
-
-instance D.FromDhall BasicReversedCard
+} deriving stock (Eq, Generic, Show)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) BasicReversedCard
 
 makeFieldsNoPrefix ''BasicReversedCard
-
-instance D.FromDhall Locale
 
 data MinimalReversedCard = MinimalReversedCard {
   _front :: VF
 , _back  :: VF
-} deriving (Eq, Show, Generic)
+} deriving stock (Eq, Show, Generic)
+  deriving (D.FromDhall, D.ToDhall)
+    via D.Codec (D.Field (D.DropPrefix "_")) MinimalReversedCard
 
 makeFieldsNoPrefix ''MinimalReversedCard
 
-instance D.FromDhall MinimalReversedCard
-
 data Spec =
-    Pronunciation   PronunciationSpec
+    Pronunciation   [PronunciationSpec]
   | Excerpt         [ExcerptSpec]
   | BasicReversed   [BasicReversedCard]
   | MinimalReversed [MinimalReversedCard]
-    deriving Generic
+    deriving stock Generic
+    deriving D.FromDhall
+      via D.Codec (D.Field (D.DropPrefix "_")) Spec
 
 makePrisms ''Spec
-
-instance D.FromDhall Spec
 
 instance D.FromDhall ForvoAPIKey
 
@@ -133,25 +136,25 @@ data Part = Part {
   _outfile :: Path Rel File
 , _spec    :: Spec
 } deriving Generic
+  deriving D.FromDhall
+    via D.Codec (D.Field (D.DropPrefix "_")) Part
 
 makeFieldsNoPrefix ''Part
-
-instance D.FromDhall Part
 
 data Deck = Deck {
   _resourceDirs :: ResourceDirs
 , _exportDirs   :: ExportDirs
 , _parts        :: [Part]
-} deriving Generic
+} deriving stock Generic
+  deriving D.FromDhall
+    via D.Codec (D.Field (D.DropPrefix "_")) Deck
 
 makeFieldsNoPrefix ''Deck
 
-instance D.FromDhall Deck
-
 data FlashBlast = FlashBlast {
-  _decks :: Map Text Deck
+  _decks       :: Map Text Deck
 , _forvoApiKey :: Maybe ForvoAPIKey
-} deriving Generic
+} deriving stock Generic
 
 makeFieldsNoPrefix ''FlashBlast
 

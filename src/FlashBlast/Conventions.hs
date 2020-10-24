@@ -24,6 +24,7 @@ data VF = Empty | Raw Text | Images [Path Rel File] | Audio (Path Rel File)
 makePrisms ''VF
 
 instance FromDhall VF
+instance ToDhall VF
 
 withLensesAndProxies [d|
   type FFront a      = "front" :-> a
