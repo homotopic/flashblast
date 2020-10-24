@@ -16,9 +16,12 @@ import           RIO.List.Partial
 import qualified RIO.Text         as T
 import qualified RIO.Text.Lazy    as LT
 import qualified RIO.Text.Partial as T
+import Optics hiding ((%), Empty)
 
 data VF = Empty | Raw Text | Images [Path Rel File] | Audio (Path Rel File)
   deriving (Eq, Show ,Generic)
+
+makePrisms ''VF
 
 instance FromDhall VF
 

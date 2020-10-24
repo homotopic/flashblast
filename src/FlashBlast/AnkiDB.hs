@@ -21,3 +21,16 @@ interpretAnkiDBIO = interpret $ \case
     CopyToCollections xs -> forM_ xs $ \x -> do
                                f <- asks unUserProfile
                                copyFile x (f </> $(mkRelDir "collections.media") </> filename x)
+
+
+
+type AnkiMediaMap = Map Int (Path Rel File)
+
+data AnkiCollectionsDatabase = AnkiCollectionsDatabase ()
+  deriving (Eq, Show, Generic)
+
+data CollectionsPackage = CollectionsPackage {
+  media       :: AnkiMediaMap
+, collections :: AnkiCollectionsDatabase
+, filecontent :: [ByteString]
+} deriving (Eq, Show, Generic)

@@ -31,6 +31,7 @@ library
       FlashBlast.ForvoClient
       FlashBlast.FS
       FlashBlast.JSONFileStore
+      FlashBlast.KVStore
       FlashBlast.YouTubeDL
   other-modules:
       Paths_flashblast
@@ -47,10 +48,12 @@ library
     , composite-base
     , dhall
     , formatting
+    , generic-monoid
     , http-conduit
     , lucid
     , megaparsec
     , optics
+    , optics-extra
     , path
     , path-dhall-instance
     , path-utils
@@ -89,10 +92,12 @@ executable flashblast
     , dhall
     , flashblast
     , formatting
+    , generic-monoid
     , http-conduit
     , lucid
     , megaparsec
     , optics
+    , optics-extra
     , path
     , path-dhall-instance
     , path-utils

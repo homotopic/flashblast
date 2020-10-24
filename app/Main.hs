@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 
 import           Colog.Polysemy
+import Data.Monoid.Generic
 import FlashBlast.Domain
 import RIO.Time
 import Colog.Polysemy.Formatting.LogEnv
@@ -24,6 +25,7 @@ import           Polysemy.Input
 import           Polysemy.KVStore
 import           Polysemy.Video hiding (to)
 
+import FlashBlast.KVStore
 import           FlashBlast.ClozeParse
 import qualified FlashBlast.Config as Config
 import           FlashBlast.FS
@@ -33,71 +35,74 @@ import           FlashBlast.JSONFileStore
 import           FlashBlast.YouTubeDL
 import           Polysemy.State
 import           RIO.List
-import RIO hiding(view, to, Builder, logInfo)
+import RIO hiding(view, to, Builder, logInfo, (^.), writeFileUtf8, over)
 import qualified RIO.Map                  as Map
 import qualified RIO.Text                 as T
---import Formatting
---import Formatting.Time
+import qualified Formatting as F
+import Formatting.Time
 import Polysemy.Tagged
 import qualified Text.Subtitles.SRT       as SR
+import FlashBlast.KVStore
 import Optics
 
-{--
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
 
 fromRange :: SR.Range -> Range
 fromRange (SR.Range f t) = Range (fromTime f) (fromTime t)
 
-fFieldsGreenBarSep :: UseColor -> Format r ([Builder] -> r)
-fFieldsGreenBarSep useColor = later $ \fields ->
+fFieldsGreenBarSep :: UseColor -> F.Format r ([Builder] -> r)
+fFieldsGreenBarSep useColor = F.later $ \fields ->
   let withFG = getWithFG useColor
-      sep = format builder $ withFG Green " | "
-  in bformat (intercalated sep builder) fields
+      sep = F.format F.builder $ withFG Green " | "
+  in F.bformat (F.intercalated sep F.builder) fields
 
-interpretVideoSource :: Members '[Input ResourceDirs, YouTubeDL] m => VideoSource -> Sem m (Path Rel File)
+interpretVideoSource :: Members '[Input Config.ResourceDirs, YouTubeDL] m
+                     => Config.VideoSource
+                     -> Sem m (Path Rel File)
 interpretVideoSource = \case
-  Dhall.YouTubeDL (YDLInfo x y f) -> do
-    ResourceDirs{..} <- input @ResourceDirs
-    youTubeDL' x (video </> y) f
-    return (video </> y)
-  LocalVideo x -> do
-    ResourceDirs{..} <- input @ResourceDirs
-    return (video </> x)
+  Config.YouTubeDL (Config.YDLInfo x y f) -> do
+    Config.ResourceDirs{..} <- input @Config.ResourceDirs
+    youTubeDL' x (_video </> y) f
+    return (_video </> y)
+  Config.LocalVideo x -> do
+    Config.ResourceDirs{..} <- input @Config.ResourceDirs
+    return (_video </> x)
 
-runExcerptSpecIO :: Members '[Error SubtitleParseException
-                       , FSExist
-                       , FSTemp
-                       , FSCopy
-                       , FSDir
-                       , Input ExportDirs
-                       , Input ResourceDirs
-                       , YouTubeDL
-                       , ClipProcess] m
-                       => ExcerptSpec -> Sem m [RExcerptNote]
-runExcerptSpecIO ExcerptSpec {..} = do
-  ExportDirs{..} <- input @ExportDirs
-  t <- interpretVideoSource source
-  s' <- either (throw . SubtitleParseException) return $ A.parseOnly SR.parseSRT subs
-  let cs = map (clipf  . T.pack . show . SR.index) s'
-  let es = map (audiof . T.pack . show . SR.index) s'
-  let fs = map (framef . T.pack . show . SR.index) s'
-  cs' <- filterM (fmap not . doesFileExist . (clips </>)) cs
-  es' <- filterM (fmap not . doesFileExist . (audio </>)) es
+runExcerptSpecIO :: Members '[ Error SubtitleParseException
+                             , FSExist
+                             , FSTemp
+                             , FSCopy
+                             , FSDir
+                             , Input Config.ExportDirs
+                             , Input Config.ResourceDirs
+                             , YouTubeDL
+                             , ClipProcess] m
+                 => Config.ExcerptSpec
+                 -> Sem m [RExcerptNote]
+runExcerptSpecIO Config.ExcerptSpec {..} = do
+  Config.ExportDirs{..} <- input @Config.ExportDirs
+  t <- interpretVideoSource _source
+  s' <- either (throw . SubtitleParseException) return $ A.parseOnly SR.parseSRT _subs
+  let cs = map (_clipf  . T.pack . show . SR.index) s'
+  let es = map (_audiof . T.pack . show . SR.index) s'
+  let fs = map (_framef . T.pack . show . SR.index) s'
+  cs' <- filterM (fmap not . doesFileExist . (_clips </>)) cs
+  es' <- filterM (fmap not . doesFileExist . (_audio </>)) es
   h <- createTempDirectory
-  createDirectory clips
-  createDirectory audio
-  createDirectory images
+  createDirectory _clips
+  createDirectory _audio
+  createDirectory _images
   unless (null cs') $ do
     extractClips t $ zip (fromRange . SR.range <$> s') (h </$> cs')
-    forM_ cs' $ \x -> copyFile (h </> x) (clips </> x)
+    forM_ cs' $ \x -> copyFile (h </> x) (_clips </> x)
   unless (null es') $ do
     extractAudio t $ zip (fromRange . SR.range <$> s') (h </$> es)
-    forM_ es' $ \x -> copyFile (h </> x) (audio </> x)
+    forM_ es' $ \x -> copyFile (h </> x) (_audio </> x)
   removeDirectory h
   forM (zip4 s' cs es fs) $ \(l, c, e, f) -> do
-    whenM (fmap not . doesFileExist $ images </> f) $
-      extractFrames (clips </> c) [(Time 0 0 0 0, images </> f)]
+    whenM (fmap not . doesFileExist $ _images </> f) $
+      extractFrames (_clips </> c) [(Time 0 0 0 0, _images </> f)]
     return $ val @"front" (fst . genClozePhrase . SR.dialog $ l)
           :& val @"extra" f
           :& val @"back"  e
@@ -108,28 +113,14 @@ newtype SubtitleParseException = SubtitleParseException String
 
 instance Exception SubtitleParseException
 
-type FSPKVStore = KVStore (Locale, Text) ForvoStandardPronunciationResponseBody
-
-downloadMP3For :: Members [FSPKVStore, ForvoClient, Log (Msg Severity)] r => Locale -> Text -> Sem r (Maybe ByteString)
+downloadMP3For :: Members '[ForvoClient] r => Locale -> Text -> Sem r (Maybe ByteString)
 downloadMP3For l@(Locale l') t = do
-  a <- lookupKV @(Locale, Text) @ForvoStandardPronunciationResponseBody (l, t)
-  case a of
-    Just x -> do
-      logInfo ("Response for " % accessed fst stext <> ", " % accessed snd stext % " found in cache.") (l', t)
-      p x
-    Nothing -> do
-      x <- standardPronunciation l t
-      updateKV @(Locale, Text) @ForvoStandardPronunciationResponseBody (l,t) $ Just x
-      p x
-  where
-    p :: Members '[ForvoClient] r => ForvoStandardPronunciationResponseBody -> Sem r (Maybe ByteString)
-    p ForvoStandardPronunciationResponseBody{..} = case items of
+  ForvoStandardPronunciationResponseBody {..} <- standardPronunciation l t
+  case items of
       []      -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
-getForvo :: Members '[ Log (Msg Severity)
-                     , FSKVStore Rel
-                     , FSPKVStore
+getForvo :: Members '[ FSKVStore Rel
                      , ForvoClient] r
          => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do
@@ -140,109 +131,49 @@ getForvo l t f = do
       x' <- downloadMP3For l t
       updateKV f x'
 
-data Toggle a = Toggle Bool
-  deriving (Eq, Show, Generic)
-
-data ToggleKilled a = ToggleKilled
-  deriving (Eq, Show, Generic)
-
-data ForvoEnabled
-
-fIso8601 :: FormatTime a => (Color -> Builder -> Builder) -> Format r (a -> r)
-fIso8601 withFG = later $ \time -> mconcat
-  [ bformat dateDash time
+fIso8601 :: FormatTime a => (Color -> Builder -> Builder) -> F.Format r (a -> r)
+fIso8601 withFG = F.later $ \time -> mconcat
+  [ F.bformat dateDash time
   , withFG Green "T"
-  , withFG Yellow $ bformat hms time
+  , withFG Yellow $ F.bformat hms time
   ]
 
 renderThreadTimeMessage' :: LogEnv -> ThreadTimeMessage -> T.Text
 renderThreadTimeMessage' (LogEnv useColor zone) (ThreadTimeMessage threadId time (Msg severity stack message)) =
   let withFG = getWithFG useColor
-  in sformat (fFieldsGreenBarSep useColor)
-    [ bformat (fSeverity withFG) severity
-    , bformat (fIso8601 withFG) (utcToZonedTime zone time)
-    , bformat stext message
+  in F.sformat (fFieldsGreenBarSep useColor)
+    [ F.bformat (fSeverity withFG) severity
+    , F.bformat (fIso8601 withFG) (utcToZonedTime zone time)
+    , F.bformat F.stext message
     ]
---}
-{--
-runMultiClozeSpecIO :: Members '[ Log (Msg Severity)
-                                , Input ResourceDirs
-                                , FSPKVStore
+
+
+runMultiClozeSpecIO :: Members '[ Input Config.ResourceDirs
                                 , FSWrite
                                 , FSRead
                                 , FSExist
-                                , FSDir
-                                , ForvoClient] m
+                                , FSDir] m
                     => (Text -> Path Rel File)
-                    -> Maybe ForvoSpec
-                    -> MultiClozeSpec
+                    -> Maybe Config.ForvoSpec
+                    -> Config.MultiClozeSpec
                     -> Sem m [RForvoNote]
-runMultiClozeSpecIO f s (MultiClozeSpec p is) = do
-    ResourceDirs{..} <- input @ResourceDirs
+runMultiClozeSpecIO f s (Config.MultiClozeSpec p is) = do
+    Config.ResourceDirs{..} <- input @Config.ResourceDirs
     forM p \a -> let (bs, cs) = genClozePhrase a
-                 in genForvos bs is (map f cs)
+                 in return $ genForvos bs is (map f cs)
 
-runPronunciationSpecIO :: Members '[Input ResourceDirs
-                                   , Log (Msg Severity)
-                                   , FSPKVStore
-                                   , ForvoClient
+runPronunciationSpecIO :: Members '[Input Config.ResourceDirs
                                    , FSWrite
                                    , FSExist
                                    , FSRead
                                    , FSDir
-                                   , State (Toggle ForvoEnabled)
                                    ] m
-                        => PronunciationSpec
+                        => Config.PronunciationSpec
                         -> Sem m [RForvoNote]
-runPronunciationSpecIO (PronunciationSpec f ms a) = do
+runPronunciationSpecIO (Config.PronunciationSpec f ms a) = do
                                                      zs <- forM ms $ runMultiClozeSpecIO f a
                                                      return $ join zs
 
-
-
-runSomeSpec :: Members [ Log (Msg Severity)
-                       , ClipProcess
-                       , ForvoClient
-                       , State (Toggle ForvoEnabled)
-                       , Input ResourceDirs
-                       , Error SubtitleParseException
-                       , Input ExportDirs
-                       , YouTubeDL
-                       , FSTemp
-                       , FSExist
-                       , FSWrite
-                       , FSDir
-                       , FSRead
-                       , FSCopy
-                       , FSPKVStore] m => Spec -> Sem m [SomeNote]
-runSomeSpec p = case p of
-      Excerpt xs         -> fmap SomeNote <$> (join <$> mapM runExcerptSpecIO xs)
-      Pronunciation xs   -> fmap (fmap SomeNote) . runPronunciationSpecIO $ xs
-      MinimalReversed xs -> mapM (fmap SomeNote . runMinimalReversed) xs
-      BasicReversed xs   -> mapM (fmap SomeNote . runBasicReversed) xs
-
-runMakeDeck :: Members [ Log (Msg Severity)
-                       , ClipProcess
-                       , ForvoClient
-                       , State (Toggle ForvoEnabled)
-                       , Error SubtitleParseException
-                       , YouTubeDL
-                       , FSWrite
-                       , FSExist
-                       , FSTemp
-                       , FSDir
-                       , FSCopy
-                       , FSRead
-                       , FSPKVStore] m => Deck -> Sem m ()
-runMakeDeck Deck{..} = do
-  let ExportDirs{..} = exportDirs
-  runInputConst @ResourceDirs resourceDirs $
-    runInputConst @ExportDirs exportDirs $
-      forM_ parts \(Part out p) -> do
-        x <- runSomeSpec p
-        writeFileUtf8 (notes </> out) $ T.intercalate "\n" $ renderNote <$> x
---}
-type FSKVStore b = KVStore (Path b File) ByteString
 
 runFSKVStoreRelIn :: Members '[FSExist, FSRead, FSWrite, FSDir] r => Path b Dir -> Sem (FSKVStore Rel ': r) a -> Sem r a
 runFSKVStoreRelIn d = interpret \case
@@ -258,38 +189,6 @@ runFSKVStoreRelIn d = interpret \case
       Nothing -> pure ()
       Just x  -> writeFileBS (d </> k) x
 
-{--
-data PronunciationDictionary m a where
-  DiscoverClozePhrases       :: MultiClozeSpec -> PronunciationDictionary m [(Locale, Text)]
-  DoesPronunciationFileExist :: (Locale, Text) -> PronunciationDictionary m Bool
-  FetchPronunciationData     :: (Locale, Text) -> PronunciationDictionary m ByteString
-  WritePronunciationData     :: (Locale, Text) -> ByteString -> PronunciationDictionary m ()
-
-makeSem ''PronunciationDictionary
-
-fillPronunciationDictionary :: Members '[PronunciationDictionary] r => PronunciationSpec -> Sem r ()
-filPronunciationDictionary  = do
-  zs <- discoverClozePhrases x
-  forM zs $ \z -> do
-    x <- doesPronunciationFileExist z
-    case x of
-      True  -> return ()
-      False -> do
-        y <- fetchPronunciationData z
-        writePronunciationData z
---}
-
-{-
-extractClozes :: Text -> [Text]
-extractClozes = snd . genClozePhrase
-
-getForvoPrep :: Deck -> [(ForvoSpec, (Text -> Path Rel File), [Text])]
-getForvoPrep (Deck{..}) = join $ map (\x ->
-  case x of
-    Pronunciation (PronunciationSpec f ms (Just z)) -> [(z, f, join $ map extractClozes (join $ map phrases ms))]
-    _ -> []
-  ) (map spec parts)
-
 hotKVStore :: forall t t' k v r. Members '[Input k, Tagged t (KVStore k v), Tagged t' (KVStore k v)] r => Sem r ()
 hotKVStore = do
   a <- input @k
@@ -302,7 +201,7 @@ hotKVStore = do
       case x of
         Nothing -> return ()
         Just x' -> tag @t @(KVStore k v) $ writeKV @k @v a x'
---}
+
 runKVStoreAsKVStore :: forall k v k' v' r a. Getter k k' -> Iso' v v' -> Sem (KVStore k v ': r) a -> Sem (KVStore k' v' ': r) a
 runKVStoreAsKVStore f g = reinterpret \case
   LookupKV k   -> fmap (review g) <$> lookupKV @k' @v' (view f k)
@@ -311,7 +210,9 @@ runKVStoreAsKVStore f g = reinterpret \case
 data Deck = Deck {
   notes :: [Path Rel File]
 , media :: [Path Rel File]
-} deriving (Eq, Show, Generic)
+} deriving stock (Eq, Show, Generic)
+  deriving Semigroup via GenericSemigroup Deck
+  deriving Monoid via GenericMonoid Deck
 
 generateMinimalReversedNoteVF :: Config.MinimalReversedCard -> RMinimalNoteVF
 generateMinimalReversedNoteVF Config.MinimalReversedCard{..} = val @"front" _front
@@ -325,111 +226,66 @@ generateBasicReversedNoteVF Config.BasicReversedCard{..} = val @"front"       _f
                                                         :& val @"back-extra"  _back_extra
                                                         :& RNil
 
-makeDeck :: Members '[] r
+writeRenderedNote :: (Member FSWrite m, RenderNote a) => Path Rel File -> [a] -> Sem m Deck
+writeRenderedNote x a = do
+  writeFileUtf8 x . T.intercalate "\n" . fmap renderNote $ a
+  return $ Deck [x] []
+
+extractRelevantParts :: Prism' Config.Spec x -> Config.Deck -> Map (Path Rel File) x
+extractRelevantParts x = Map.fromList . itoListOf
+                           ( Config.parts
+                           % itraversed
+                           %> reindexed (view Config.outfile) selfIndex
+                           % Config.spec
+                           % x
+                           )
+
+makeSubDeck :: Config.Deck -> Prism' Config.Spec b -> (Path Rel File -> b -> Sem r Deck) -> Sem r Deck
+makeSubDeck x p r = fmap mconcat <$> mapM (uncurry r) $ Map.toList (extractRelevantParts p x)
+
+makeDeck :: Members '[ FSWrite
+                     , FSDir
+                     , FSRead
+                     , FSExist
+                     , FSTemp
+                     , FSCopy
+                     , Error SubtitleParseException
+                     , ClipProcess
+                     , YouTubeDL] r
          => Config.Deck
          -> Sem r Deck
-makeDeck x = do
-  let f = itoListOf
-            ( Config.parts
-            % itraversed
-            % Config.spec
-            % Config._Pronunciation
-            % Config.multis
-            % traversed
-            % Config.phrases
-            ) x
-  let a = itoListOf
-            ( Config.parts
-            % itraversed
-            % Config.spec
-            % Config._BasicReversed
-            ) x
-  return $ Deck [] []
+makeDeck x = runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
+           . runInputConst @Config.ExportDirs   (view Config.exportDirs   x)
+           $ do
+  let o' = x ^. Config.exportDirs % Config.notes
+  as <- makeSubDeck x Config._BasicReversed   $ \x y -> writeRenderedNote (o' </> x) (fmap generateBasicReversedNoteVF y)
+  bs <- makeSubDeck x Config._MinimalReversed $ \x y -> writeRenderedNote (o' </> x) (fmap generateMinimalReversedNoteVF y)
+  cs <- makeSubDeck x Config._Excerpt         $ \x y -> mapM runExcerptSpecIO y >>= writeRenderedNote (o' </> x) . join
+  ds <- makeSubDeck x Config._Pronunciation   $ \x y -> runPronunciationSpecIO y >>= writeRenderedNote (o' </> x)
+  return $ as <> bs
 
---}
-{--
-live :: (Text -> Path Rel File) -> IO ()
-live f = hotKVStore @"local" @"remote" @Text @ByteString
-          & untag @"local" @(KVStore Text ByteString)
-          & runKVStoreAsKVStore @Text @ByteString @(Path Rel File) @ByteString (to f) (iso id id)
-          & runFSKVStoreRelIn $(mkRelDir "foo")
-          & untag @"remote" @(KVStore Text ByteString)
-          & runForvoClient
-          & runError @ForvoAPIKeyIncorrectException
-          & runError @ForvoLimitReachedException
-          & runError @ForvoResponseNotUnderstood
-          & runRemoteHttpRequest
-          & runError @JSONException
-          & runError @BadRequestException
-          & runInputConst
-          & runFSReadIO
-          & runFSWriteIO
-          & runFSExistIO
-          & runFSDirIO
-          & runFSTempIO
-          & runM
-
-test :: IO ()
-test = hotKVStore @"foo" @"bar" @Char @Int
-        & runInputConst @Char 'a'
-        & untag @"bar" @(KVStore Char Int)
-        & runKVStoreAsState
-        & evalState (Map.fromList [('a', 1)])
-        & untag @"foo" @(KVStore Char Int)
-        & runKVStoreAsState
-        & evalState (Map.fromList [])
-        & runM
---}
---
-main :: IO ()
-main = flashblast @Config.Deck @Deck makeDeck
-        & untag @DeckConfiguration
-        & runInputConst (Config.Deck { })
---        & runKVStoreAsState @(Locale, Text) @(Path Rel File)
-  --      & evalState (Map.fromList [])
-        & untag @CollectionsPackage
-        & runOutputSem (embed . traceShowM)
-        & runM
-{--
 main :: IO ()
 main = do
-   FlashBlastConfig{..} <- D.input D.auto "./index.dhall"
-   logEnvStderr <- newLogEnv stderr
-   let logT = logTextStderr & cmap (renderThreadTimeMessage' logEnvStderr)
-   runM $ do
-     x <- runError @ForvoLimitReachedException
-        . runInputConst @ForvoAPIKey (maybe (ForvoAPIKey "") RIO.id forvoApiKey)
-        . interpretForvoClient
-        $ forM (Map.toList $ decks) $ \(n, x@Deck{..}) -> do
-            let x' = getForvoPrep x
-            forM x' $ \(ForvoSpec{..}, f, zs) -> forM zs $ \t -> getForvo locale t (f t)
-{--   x <- runM
-      . evalState @(Toggle ForvoEnabled) (Toggle True)
-      . runFSExistIO
-      . runFSReadIO
-      . runFSWriteIO
-      . runFSDirIO
-      . runFSTempIO
-      . runFSCopyIO
-      . runLogAction  logT
-      . addThreadAndTimeToLog
-      . mapLog (logInfo' . fileExistsLogText)
-      . logFileExists
-      . runError @SomeException
-      . mapError @JSONParseException SomeException
-      . mapError @SubtitleParseException SomeException
-      . interpretFFMpegCli
-      . interpretYouTubeDL
-      . runInputConst (JSONFileStore $(mkRelFile ".forvocache"))
-      . runKVStoreAsJSONFileStore
-      . mapError @JSONException SomeException
-      . mapError @BadRequestException SomeException
-      . interpretRemoteHttpRequest
-      . mapError @ForvoResponseNotUnderstood SomeException
-      . mapError @ForvoAPIKeyIncorrectException SomeException
-      . mapError @ForvoLimitReachedException SomeException
-      $ mapM_ runMakeDeck $ fmap snd . Map.toList $ decks--}
-     case x of
-       Left e -> throwIO e
-       Right x' -> return x'
-       --}
+  Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
+  forM_ _decks $ \x -> do
+    flashblast @Config.Deck @Deck makeDeck
+        & untag @DeckConfiguration
+        & runInputConst x
+        & untag @CollectionsPackage
+        & runOutputSem (embed . traceShowM)
+        & runFSWriteIO
+        & runFSDirIO
+        & runFSCopyIO
+        & runFSExistIO
+        & runFSTempIO
+        & runFSReadIO
+        & interpretYouTubeDL
+        & runError @SubtitleParseException
+        & runError @ForvoLimitReachedException
+        & runRemoteHttpRequest
+        & runError @ForvoResponseNotUnderstood
+        & runError @ForvoAPIKeyIncorrectException
+        & runError @JSONException
+        & runError @BadRequestException
+        & interpretFFMpegCli
+        & runM

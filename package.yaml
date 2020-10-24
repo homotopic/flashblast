@@ -65,6 +65,7 @@ dependencies:
 - composite-base
 - dhall
 - formatting
+- generic-monoid
 - http-conduit
 - lucid
 - megaparsec
@@ -80,6 +81,7 @@ dependencies:
 - rio
 - semialign
 - optics
+- optics-extra
 - subtitleParser
 - temporary
 - text

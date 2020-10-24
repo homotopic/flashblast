@@ -119,3 +119,5 @@ fileExistsLogText :: FileExists -> Text
 fileExistsLogText = \case
   FileExists f    -> sformat ("File " % path % " found in filesystem.") f
   FileNotExists f -> sformat ("File " % path % " not found in filesystem.") f
+
+
