@@ -5,7 +5,6 @@
 
 Top level domain specification for FlashBlast.
 -}
-{-# LANGUAGE TemplateHaskell #-}
 module FlashBlast.Domain where
 
 import RIO

@@ -1,51 +1,53 @@
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE TemplateHaskell       #-}
 
 import           Colog.Polysemy
-import Data.Monoid.Generic
-import FlashBlast.Domain
-import RIO.Time
-import Colog.Polysemy.Formatting.LogEnv
-import Colog.Polysemy.Formatting.ThreadTimeMessage
-import Colog.Polysemy.Formatting.Color
-import Colog.Polysemy.Formatting.Render
-import Data.Text.Lazy.Builder (Builder)
 import           Colog.Polysemy.Formatting
+import           Colog.Polysemy.Formatting.Color
+import           Colog.Polysemy.Formatting.LogEnv
+import           Colog.Polysemy.Formatting.Render
+import           Colog.Polysemy.Formatting.ThreadTimeMessage
 import           Composite.Record
-import qualified Data.Attoparsec.Text     as A
-import qualified Dhall                    as D
+import qualified Data.Attoparsec.Text                        as A
+import           Data.Monoid.Generic
+import           Data.Text.Lazy.Builder                      (Builder)
+import qualified Dhall                                       as D
+import           FlashBlast.Domain
 import           Network.HTTP.Simple
-import Polysemy.Output
 import           Path
-import           Path.Dhall               ()
+import           Path.Dhall                                  ()
 import           Path.Utils
 import           Polysemy
-import           Polysemy.Error           as P
+import           Polysemy.Error                              as P
 import           Polysemy.Input
 import           Polysemy.KVStore
-import Polysemy.Several
-import           Polysemy.Video hiding (to)
+import           Polysemy.Output
+import           Polysemy.Several
+import           Polysemy.Video                              hiding (to)
+import           RIO.Time
 
-import FlashBlast.KVStore
 import           FlashBlast.ClozeParse
-import qualified FlashBlast.Config as Config
-import           FlashBlast.FS
+import qualified FlashBlast.Config                           as Config
 import           FlashBlast.Conventions
-import           FlashBlast.ForvoClient hiding (id)
+import           FlashBlast.ForvoClient                      hiding (id)
+import           FlashBlast.FS
 import           FlashBlast.JSONFileStore
+import           FlashBlast.KVStore
 import           FlashBlast.YouTubeDL
+import qualified Formatting                                  as F
+import           Formatting.Time
+import           Optics
+import           Polysemy.Methodology
 import           Polysemy.State
+import           Polysemy.Tagged
+import           RIO                                         hiding (Builder,
+                                                              logInfo, over, to,
+                                                              view,
+                                                              writeFileUtf8,
+                                                              (^.))
 import           RIO.List
-import RIO hiding(view, to, Builder, logInfo, (^.), writeFileUtf8, over)
-import qualified RIO.Map                  as Map
-import qualified RIO.Text                 as T
-import qualified Formatting as F
-import Formatting.Time
-import Polysemy.Tagged
-import qualified Text.Subtitles.SRT       as SR
-import FlashBlast.KVStore
-import Optics
-import Polysemy.Methodology
+import qualified RIO.Map                                     as Map
+import qualified RIO.Text                                    as T
+import qualified Text.Subtitles.SRT                          as SR
 
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
@@ -119,7 +121,7 @@ downloadMP3For :: Members '[ForvoClient] r => Locale -> Text -> Sem r (Maybe Byt
 downloadMP3For l@(Locale l') t = do
   ForvoStandardPronunciationResponseBody {..} <- standardPronunciation l t
   case items of
-      []      -> return Nothing
+      []     -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
 getForvo :: Members '[ FSKVStore Rel
@@ -182,9 +184,9 @@ runFSKVStoreRelIn d = interpret \case
   LookupKV k   -> do
     createDirectory d
     z <- doesFileExist (d </> k)
-    case z of
-      True  -> fmap Just . readFileBS $ d </> k
-      False -> return Nothing
+    if z
+      then fmap Just . readFileBS $ d </> k
+      else return Nothing
   UpdateKV k v -> do
     createDirectory d
     case v of
@@ -241,8 +243,8 @@ makeSubDeck' :: (Members '[Input Config.ExportDirs, FSWrite] r, RenderNote a) =>
 makeSubDeck' r x = do
   Config.ExportDirs{..} <- input @Config.ExportDirs
   (x' :: Map (Path Rel File) [a]) <- mapM (mapM r) x
-  forM (Map.toList x') $ \(f, (ks :: [a])) ->
-    writeFileUtf8 (_notes </> f) . T.intercalate "\n" . join . fmap (fmap renderNote) $ (ks :: [a])
+  forM_ (Map.toList x') $ \(f, ks) ->
+    writeFileUtf8 (_notes </> f) . T.intercalate "\n" $ (fmap renderNote =<< ks)
   return $ Deck (Map.keys x') []
 
 type DeckSplit = '[Map (Path Rel File) [Config.MinimalReversedCard]
