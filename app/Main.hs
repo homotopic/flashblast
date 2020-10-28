@@ -45,6 +45,7 @@ import Polysemy.Tagged
 import qualified Text.Subtitles.SRT       as SR
 import FlashBlast.KVStore
 import Optics
+import Polysemy.Methodology
 
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
@@ -227,25 +228,14 @@ generateBasicReversedNoteVF Config.BasicReversedCard{..} = val @"front"       _f
                                                         :& val @"back-extra"  _back_extra
                                                         :& RNil
 
-extractRelevantParts :: Prism' Config.Spec x -> Config.Deck -> Map (Path Rel File) x
-extractRelevantParts x = Map.fromList . itoListOf
-                           ( Config.parts
-                           % itraversed
-                           %> reindexed (view Config.outfile) selfIndex
-                           % Config.spec
-                           % x
-                           )
-
-decomposeDeckConfig :: Config.Deck -> HList '[ Map (Path Rel File) [Config.MinimalReversedCard]
-                                             , Map (Path Rel File) [Config.BasicReversedCard]
-                                             , Map (Path Rel File) [Config.ExcerptSpec]
-                                             , Map (Path Rel File) [Config.PronunciationSpec]
-                                             ]
-decomposeDeckConfig x = extractRelevantParts Config._MinimalReversed x
-                    ::: extractRelevantParts Config._BasicReversed   x
-                    ::: extractRelevantParts Config._Excerpt         x
-                    ::: extractRelevantParts Config._Pronunciation   x
-                    ::: HNil
+extractParts :: Prism' Config.Spec x -> Config.Deck -> Map (Path Rel File) x
+extractParts x = Map.fromList . itoListOf
+                  ( Config.parts
+                  % itraversed
+                  %> reindexed (view Config.outfile) selfIndex
+                  % Config.spec
+                  % x
+                  )
 
 makeSubDeck' :: (Members '[Input Config.ExportDirs, FSWrite] r, RenderNote a) => (b -> Sem r [a]) -> Map (Path Rel File) [b] -> Sem r Deck
 makeSubDeck' r x = do
@@ -255,9 +245,15 @@ makeSubDeck' r x = do
     writeFileUtf8 (_notes </> f) . T.intercalate "\n" . join . fmap (fmap renderNote) $ (ks :: [a])
   return $ Deck (Map.keys x') []
 
+type DeckSplit = '[Map (Path Rel File) [Config.MinimalReversedCard]
+                 , Map (Path Rel File) [Config.BasicReversedCard]
+                 , Map (Path Rel File) [Config.ExcerptSpec]
+                 , Map (Path Rel File) [Config.PronunciationSpec]
+                 ]
+
 main :: IO ()
 main = do
-  Config.FlashBlast{..} <- D.input auto "./index.dhall"
+  Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
   forM_ _decks $ \x -> do
     flashblast @Config.Deck @Deck
         & untag @DeckConfiguration
@@ -265,12 +261,27 @@ main = do
         & untag @CollectionsPackage
         & runOutputSem (embed . traceShowM)
         & untag @ConstructionMethodology
-        & cmapMethodology decomposeDeckConfig
-        & runSubMethodology (makeSubDeck' $ pure . pure . generateMinimalReversedNoteVF)
-        & runSubMethodology (makeSubDeck' $ pure . pure . generateBasicReversedNoteVF)
-        & runSubMethodology (makeSubDeck' $ runExcerptSpecIO)
-        & runSubMethodology (makeSubDeck' $ runPronunciationSpecIO)
-        & endMethodology
+        & decomposeMethodology @Config.Deck
+                               @DeckSplit
+                               @Deck
+        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.MinimalReversedCard])
+          & runMethodologyPure (extractParts Config._MinimalReversed)
+        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.BasicReversedCard])
+          & runMethodologyPure (extractParts Config._BasicReversed)
+        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.ExcerptSpec])
+          & runMethodologyPure (extractParts Config._Excerpt)
+        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.PronunciationSpec])
+          & runMethodologyPure (extractParts Config._Pronunciation)
+        & endMethodologyInitial
+        & separateMethodologyTerminal @(Map (Path Rel File) [Config.MinimalReversedCard]) @DeckSplit @Deck
+          & runMethodologySem (makeSubDeck' $ pure . pure . generateMinimalReversedNoteVF)
+        & separateMethodologyTerminal @(Map (Path Rel File) [Config.BasicReversedCard]) @DeckSplit @Deck
+          & runMethodologySem (makeSubDeck' $ pure . pure . generateBasicReversedNoteVF)
+        & separateMethodologyTerminal @(Map (Path Rel File) [Config.ExcerptSpec]) @DeckSplit @Deck
+          & runMethodologySem (makeSubDeck' runExcerptSpecIO)
+        & separateMethodologyTerminal @(Map (Path Rel File) [Config.PronunciationSpec]) @DeckSplit @Deck
+          & runMethodologySem (makeSubDeck' runPronunciationSpecIO)
+        & endMethodologyTerminal
         & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
         & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
         & runFSWriteIO

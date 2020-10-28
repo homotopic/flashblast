@@ -74,6 +74,7 @@ dependencies:
 - path-dhall-instance
 - path-utils
 - polysemy
+- polysemy-methodology
 - polysemy-plugin
 - polysemy-video >= 0.1.1.0
 - polysemy-zoo
