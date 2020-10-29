@@ -66,6 +66,7 @@ dependencies:
 - dhall
 - formatting
 - generic-monoid
+- ghc-clippy-plugin
 - http-conduit
 - lucid
 - megaparsec
@@ -112,4 +113,4 @@ ghc-options:
 - -Wincomplete-uni-patterns
 - -Wredundant-constraints
 - -fplugin=Polysemy.Plugin
-
+- -fplugin=Clippy

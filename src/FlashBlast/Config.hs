@@ -155,7 +155,7 @@ data FlashBlast = FlashBlast {
   _decks       :: Map Text Deck
 , _forvoApiKey :: Maybe ForvoAPIKey
 } deriving stock Generic
+  deriving D.FromDhall
+    via D.Codec (D.Field (D.DropPrefix "_")) FlashBlast
 
 makeFieldsNoPrefix ''FlashBlast
-
-instance D.FromDhall FlashBlast

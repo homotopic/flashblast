@@ -11,12 +11,12 @@ import           Lucid
 import           Path
 import           Path.Dhall       ()
 import           Path.Utils
-import           RIO
+import           RIO 
 import           RIO.List.Partial
 import qualified RIO.Text         as T
 import qualified RIO.Text.Lazy    as LT
 import qualified RIO.Text.Partial as T
-import Optics hiding ((%), Empty)
+import Optics hiding ((%), Empty, view)
 
 data VF = Empty | Raw Text | Images [Path Rel File] | Audio (Path Rel File)
   deriving (Eq, Show ,Generic)
@@ -121,3 +121,25 @@ instance RenderNote RForvoNote where
 instance RenderNote SomeNote where
   renderNote (SomeNote e) = renderNote e
 
+class HasMedia f where
+  getMedia :: f -> [Path Rel File]
+
+vfMedia :: VF -> [Path Rel File]
+vfMedia (Images x) = x
+vfMedia (Audio x) = [x]
+vfMedia _ = []
+
+instance HasMedia RBasicReversedNoteVF where
+  getMedia f = vfMedia (view fFront f) <> vfMedia (view fBack f) <> vfMedia (view fFrontExtra f) <> vfMedia (view fBackExtra f)
+
+instance HasMedia RMinimalNoteVF where
+  getMedia f = vfMedia (view fFront f) <> vfMedia (view fBack f)
+
+instance HasMedia RExcerptNote where
+  getMedia f = [view fExtra f, view fBack f]
+
+instance HasMedia RForvoNote where
+  getMedia f = catMaybes [ view fAudio1 f, view fAudio2 f, view fAudio3 f, view fAudio4 f
+               , view fAudio5 f, view fAudio6 f, view fAudio7 f, view fAudio8 f
+               , view fAudio9 f, view fAudio10 f, view fAudio11 f, view fAudio12 f
+               , view fAudio13 f, view fAudio14 f, view fAudio15 f, view fAudio16 f]

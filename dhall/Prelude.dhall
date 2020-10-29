@@ -15,26 +15,28 @@ let ExcerptSpec =
 
 let VariField = < Empty | Raw : Text | Images : List Text | Audio : Text >
 
-let MinimalReversedSpec = { from : VariField, to : VariField }
+let MinimalReversedSpec = { front : VariField, back : VariField }
 
 let BasicReversedSpec =
-      { from : VariField
-      , from_extra : VariField
-      , to : VariField
-      , to_extra : VariField
+      { front : VariField
+      , front_extra : VariField
+      , back : VariField
+      , back_extra : VariField
       }
 
-let Forvo = { locale : Text }
+let Forvo = { locale : Text, preferredspeakers : List Text }
+
+let PronunciationSpec =
+         { multis : List MultiClozeSpec
+         , audiof : Text → Text
+         , forvo : Optional Forvo
+         }
 
 let Spec =
-      < Pronunciation :
-          { multis : List MultiClozeSpec
-          , audiof : Text → Text
-          , forvo : Optional Forvo
-          }
-      | Excerpt : List ExcerptSpec
+      < Pronunciation   : List PronunciationSpec
+      | Excerpt         : List ExcerptSpec
       | MinimalReversed : List MinimalReversedSpec
-      | BasicReversed : List BasicReversedSpec
+      | BasicReversed   : List BasicReversedSpec
       >
 
 let Part = { outfile : Text, spec : Spec }

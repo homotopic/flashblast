@@ -11,7 +11,6 @@ import qualified Data.Attoparsec.Text                        as A
 import           Data.Monoid.Generic
 import           Data.Text.Lazy.Builder                      (Builder)
 import qualified Dhall                                       as D
-import           FlashBlast.Domain
 import           Network.HTTP.Simple
 import           Path
 import           Path.Dhall                                  ()
@@ -28,6 +27,7 @@ import           RIO.Time
 import           FlashBlast.ClozeParse
 import qualified FlashBlast.Config                           as Config
 import           FlashBlast.Conventions
+import           FlashBlast.Domain
 import           FlashBlast.ForvoClient                      hiding (id)
 import           FlashBlast.FS
 import           FlashBlast.JSONFileStore
@@ -178,41 +178,8 @@ runPronunciationSpecIO (Config.PronunciationSpec f ms a) = do
                                                      zs <- forM ms $ runMultiClozeSpecIO f a
                                                      return $ join zs
 
-
-runFSKVStoreRelIn :: Members '[FSExist, FSRead, FSWrite, FSDir] r => Path b Dir -> Sem (FSKVStore Rel ': r) a -> Sem r a
-runFSKVStoreRelIn d = interpret \case
-  LookupKV k   -> do
-    createDirectory d
-    z <- doesFileExist (d </> k)
-    if z
-      then fmap Just . readFileBS $ d </> k
-      else return Nothing
-  UpdateKV k v -> do
-    createDirectory d
-    case v of
-      Nothing -> pure ()
-      Just x  -> writeFileBS (d </> k) x
-
-hotKVStore :: forall t t' k v r. Members '[Input k, Tagged t (KVStore k v), Tagged t' (KVStore k v)] r => Sem r ()
-hotKVStore = do
-  a <- input @k
-  z <- tag @t @(KVStore k v) $ existsKV @k @v a
-  if z
-    then return ()
-  else
-    do
-      x <- tag @t' @(KVStore k v) $ lookupKV @k @v a
-      case x of
-        Nothing -> return ()
-        Just x' -> tag @t @(KVStore k v) $ writeKV @k @v a x'
-
-runKVStoreAsKVStore :: forall k v k' v' r a. Getter k k' -> Iso' v v' -> Sem (KVStore k v ': r) a -> Sem (KVStore k' v' ': r) a
-runKVStoreAsKVStore f g = reinterpret \case
-  LookupKV k   -> fmap (review g) <$> lookupKV @k' @v' (view f k)
-  UpdateKV k x -> updateKV @k' @v' (view f k) (fmap (view g) x)
-
 data Deck = Deck {
-  notes :: [Path Rel File]
+  notes :: Map (Path Rel File) Text
 , media :: [Path Rel File]
 } deriving stock (Eq, Show, Generic)
   deriving Semigroup via GenericSemigroup Deck
@@ -239,50 +206,134 @@ extractParts x = Map.fromList . itoListOf
                   % x
                   )
 
-makeSubDeck' :: (Members '[Input Config.ExportDirs, FSWrite] r, RenderNote a) => (b -> Sem r [a]) -> Map (Path Rel File) [b] -> Sem r Deck
-makeSubDeck' r x = do
-  Config.ExportDirs{..} <- input @Config.ExportDirs
-  (x' :: Map (Path Rel File) [a]) <- mapM (mapM r) x
-  forM_ (Map.toList x') $ \(f, ks) ->
-    writeFileUtf8 (_notes </> f) . T.intercalate "\n" $ (fmap renderNote =<< ks)
-  return $ Deck (Map.keys x') []
-
 type DeckSplit = '[Map (Path Rel File) [Config.MinimalReversedCard]
                  , Map (Path Rel File) [Config.BasicReversedCard]
                  , Map (Path Rel File) [Config.ExcerptSpec]
                  , Map (Path Rel File) [Config.PronunciationSpec]
                  ]
 
+type FileMap b = Map (Path b File)
+
+renderNotes :: RenderNote a => [a] -> Text
+renderNotes = T.intercalate "\n" . fmap renderNote
+
+fmapMethodology :: forall f b c r a. 
+                 ( Members '[Methodology b c] r
+                 , Traversable f)
+                => Sem (Methodology (f b) (f c) ': r) a
+                -> Sem r a
+fmapMethodology = interpret \case
+  Process b -> traverse (process @b @c) b
+
+fmap2Methodology :: forall f g b c r a. 
+                  ( Members '[Methodology b c] r
+                  , Traversable f, Traversable g)
+                 => Sem (Methodology (f (g b)) (f (g c)) ': Methodology (g b) (g c) ': r) a
+                 -> Sem r a
+fmap2Methodology = fmapMethodology @g @b @c . fmapMethodology @f @(g b) @(g c)
+
+bindMethodology :: forall f b c r a.
+                 ( Members '[Methodology b (f c)] r
+                 , Traversable f, Monad f)
+                => Sem (Methodology (f b) (f c) ': r) a
+                -> Sem r a
+bindMethodology = interpret \case
+  Process b -> join <$> traverse (process @b @(f c)) b
+
+traverseMethodology :: forall t f b c r a.
+                     ( Members '[Methodology b (f c)] r
+                     , Traversable t, Applicative f)
+                    => Sem (Methodology (t b) (f (t c)) ': r) a
+                    -> Sem r a
+traverseMethodology = interpret \case
+  Process b -> sequenceA <$> traverse (process @b @(f c)) b
+
+getMedias :: HasMedia a => FileMap Rel [a] -> [Path Rel File]
+getMedias = join . Map.elems >=> getMedia
+
+writeOutDeck :: Members '[Input Config.ExportDirs, FSWrite] r => Deck -> Sem r ()
+writeOutDeck Deck{..} = do
+  Config.ExportDirs{..} <- input @Config.ExportDirs
+  forM_ (Map.toList notes) $ \(x, k) ->  writeFileUtf8 (_notes </> x) k
+
 main :: IO ()
 main = do
   Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
   forM_ _decks $ \x -> do
     flashblast @Config.Deck @Deck
-        & untag @DeckConfiguration
-        & runInputConst x
-        & untag @CollectionsPackage
-        & runOutputSem (embed . traceShowM)
-        & untag @ConstructionMethodology
-        & decomposeMethodology @Config.Deck
-                               @DeckSplit
-                               @Deck
-        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.MinimalReversedCard])
-          & runMethodologyPure (extractParts Config._MinimalReversed)
-        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.BasicReversedCard])
-          & runMethodologyPure (extractParts Config._BasicReversed)
-        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.ExcerptSpec])
-          & runMethodologyPure (extractParts Config._Excerpt)
-        & separateMethodologyInitial @Config.Deck @(Map (Path Rel File) [Config.PronunciationSpec])
-          & runMethodologyPure (extractParts Config._Pronunciation)
-        & endMethodologyInitial
-        & separateMethodologyTerminal @(Map (Path Rel File) [Config.MinimalReversedCard]) @DeckSplit @Deck
-          & runMethodologySem (makeSubDeck' $ pure . pure . generateMinimalReversedNoteVF)
-        & separateMethodologyTerminal @(Map (Path Rel File) [Config.BasicReversedCard]) @DeckSplit @Deck
-          & runMethodologySem (makeSubDeck' $ pure . pure . generateBasicReversedNoteVF)
-        & separateMethodologyTerminal @(Map (Path Rel File) [Config.ExcerptSpec]) @DeckSplit @Deck
-          & runMethodologySem (makeSubDeck' runExcerptSpecIO)
+      & untag @DeckConfiguration
+      & runInputConst x
+      & untag @CollectionsPackage
+      & runOutputSem writeOutDeck
+      & untag @ConstructionMethodology
+        & decomposeMethodology @Config.Deck @DeckSplit @Deck
+          & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
+            & runMethodologyPure (extractParts Config._MinimalReversed)
+          & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.BasicReversedCard])
+            & runMethodologyPure (extractParts Config._BasicReversed)
+          & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
+            & runMethodologyPure (extractParts Config._Excerpt)
+          & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
+            & runMethodologyPure (extractParts Config._Pronunciation)
+          & endMethodologyInitial
+          & separateMethodologyTerminal @(FileMap Rel [Config.MinimalReversedCard]) @DeckSplit @Deck
+            & cutMethodology @(FileMap Rel [Config.MinimalReversedCard])
+                             @(FileMap Rel [RMinimalNoteVF])
+                             @Deck
+            & fmap2Methodology @(FileMap Rel) @[] @Config.MinimalReversedCard @RMinimalNoteVF
+              & runMethodologyPure generateMinimalReversedNoteVF
+            & divideMethodology @(FileMap Rel [RMinimalNoteVF])
+                                @(FileMap Rel Text)
+                                @[Path Rel File]
+                                @Deck
+              & fmapMethodology @(FileMap Rel) @[RMinimalNoteVF] @Text
+                & runMethodologyPure @[RMinimalNoteVF] @Text renderNotes
+              & runMethodologyPure @(FileMap Rel [RMinimalNoteVF]) @[Path Rel File] getMedias
+              & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+          & separateMethodologyTerminal @(FileMap Rel [Config.BasicReversedCard]) @DeckSplit @Deck
+            & cutMethodology @(FileMap Rel [Config.BasicReversedCard])
+                             @(FileMap Rel [RBasicReversedNoteVF])
+                             @Deck
+              & fmap2Methodology @(FileMap Rel) @[] @Config.BasicReversedCard @RBasicReversedNoteVF
+                & runMethodologyPure generateBasicReversedNoteVF
+            & divideMethodology @(FileMap Rel [RBasicReversedNoteVF])
+                                @(FileMap Rel Text)
+                                @[Path Rel File]
+                                @Deck
+             & fmapMethodology @(FileMap Rel) @[RBasicReversedNoteVF] @Text
+               & runMethodologyPure @[RBasicReversedNoteVF] @Text renderNotes
+             & runMethodologyPure @(FileMap Rel [RBasicReversedNoteVF]) @[Path Rel File] getMedias
+             & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+        & separateMethodologyTerminal @(FileMap Rel [Config.ExcerptSpec]) @DeckSplit @Deck
+          & cutMethodology @(FileMap Rel [Config.ExcerptSpec])
+                           @(FileMap Rel [RExcerptNote])
+                           @Deck
+            & fmapMethodology @(FileMap Rel) @[Config.ExcerptSpec] @[RExcerptNote]
+              & bindMethodology @[] @Config.ExcerptSpec @RExcerptNote
+                & runMethodologySem @Config.ExcerptSpec @[RExcerptNote] runExcerptSpecIO
+            & divideMethodology @(FileMap Rel [RExcerptNote])
+                                @(FileMap Rel Text)
+                                @[Path Rel File]
+                                @Deck
+             & fmapMethodology @(FileMap Rel) @[RExcerptNote] @Text
+               & runMethodologyPure @[RExcerptNote] @Text renderNotes
+             & runMethodologyPure @(FileMap Rel [RExcerptNote]) @[Path Rel File] getMedias
+             & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
         & separateMethodologyTerminal @(Map (Path Rel File) [Config.PronunciationSpec]) @DeckSplit @Deck
-          & runMethodologySem (makeSubDeck' runPronunciationSpecIO)
+          & cutMethodology @(FileMap Rel [Config.PronunciationSpec])
+                           @(FileMap Rel [RForvoNote])
+                           @Deck
+            & fmapMethodology @(FileMap Rel) @[Config.PronunciationSpec] @[RForvoNote]
+              & bindMethodology @[] @Config.PronunciationSpec @RForvoNote
+               & runMethodologySem runPronunciationSpecIO
+            & divideMethodology @(FileMap Rel [RForvoNote])
+                                @(FileMap Rel Text)
+                                @[Path Rel File]
+                                @Deck
+             & fmapMethodology @(FileMap Rel) @[RForvoNote] @Text
+               & runMethodologyPure @[RForvoNote] @Text renderNotes
+             & runMethodologyPure @(FileMap Rel [RForvoNote]) @[Path Rel File] getMedias
+             & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
         & endMethodologyTerminal
         & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
         & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
