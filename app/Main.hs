@@ -220,9 +220,10 @@ renderNotes = T.intercalate "\n" . fmap renderNote
 getMedias :: HasMedia a => FileMap Rel [a] -> [Path Rel File]
 getMedias = join . Map.elems >=> getMedia
 
-writeOutDeck :: Members '[Input Config.ExportDirs, FSWrite] r => Deck -> Sem r ()
+writeOutDeck :: Members '[Input Config.ExportDirs, FSDir, FSWrite] r => Deck -> Sem r ()
 writeOutDeck Deck{..} = do
   Config.ExportDirs{..} <- input @Config.ExportDirs
+  createDirectory _notes
   forM_ (Map.toList notes) $ \(x, k) ->  writeFileUtf8 (_notes </> x) k
 
 main :: IO ()
