@@ -75,12 +75,12 @@ packages:
   original:
     hackage: co-log-polysemy-formatting-0.1.0.0
 - completed:
-    hackage: polysemy-methodology-0.1.1.0@sha256:f83ef4a5adcf65596e5fe61c06ee1b980e12ea0fcb784f8469e390d0dbd34b46,971
+    hackage: polysemy-methodology-0.1.2.0@sha256:ff1f9246240b5975648e0dba97cdf8b0976b72e3624d92ad6045f818e1b95c8c,971
     pantry-tree:
-      size: 285
-      sha256: ef50aee58fde54da52c89dd756cf124769e58140729df1fb7048e079a1866ae1
+      size: 286
+      sha256: 47681b9fb2de8a81829c28ca2783128a86cc432da982f679eac46dce9dec6b03
   original:
-    hackage: polysemy-methodology-0.1.1.0
+    hackage: polysemy-methodology-0.1.2.0
 - completed:
     hackage: formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
     pantry-tree:

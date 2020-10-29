@@ -217,37 +217,6 @@ type FileMap b = Map (Path b File)
 renderNotes :: RenderNote a => [a] -> Text
 renderNotes = T.intercalate "\n" . fmap renderNote
 
-fmapMethodology :: forall f b c r a. 
-                 ( Members '[Methodology b c] r
-                 , Traversable f)
-                => Sem (Methodology (f b) (f c) ': r) a
-                -> Sem r a
-fmapMethodology = interpret \case
-  Process b -> traverse (process @b @c) b
-
-fmap2Methodology :: forall f g b c r a. 
-                  ( Members '[Methodology b c] r
-                  , Traversable f, Traversable g)
-                 => Sem (Methodology (f (g b)) (f (g c)) ': Methodology (g b) (g c) ': r) a
-                 -> Sem r a
-fmap2Methodology = fmapMethodology @g @b @c . fmapMethodology @f @(g b) @(g c)
-
-bindMethodology :: forall f b c r a.
-                 ( Members '[Methodology b (f c)] r
-                 , Traversable f, Monad f)
-                => Sem (Methodology (f b) (f c) ': r) a
-                -> Sem r a
-bindMethodology = interpret \case
-  Process b -> join <$> traverse (process @b @(f c)) b
-
-traverseMethodology :: forall t f b c r a.
-                     ( Members '[Methodology b (f c)] r
-                     , Traversable t, Applicative f)
-                    => Sem (Methodology (t b) (f (t c)) ': r) a
-                    -> Sem r a
-traverseMethodology = interpret \case
-  Process b -> sequenceA <$> traverse (process @b @(f c)) b
-
 getMedias :: HasMedia a => FileMap Rel [a] -> [Path Rel File]
 getMedias = join . Map.elems >=> getMedia
 
