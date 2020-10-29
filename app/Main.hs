@@ -276,7 +276,7 @@ main = do
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
             & runMethodologyPure (extractParts Config._Pronunciation)
           & endMethodologyInitial
-          & separateMethodologyTerminal @(FileMap Rel [Config.MinimalReversedCard]) @DeckSplit @Deck
+          & separateMethodologyTerminal @(FileMap Rel [Config.MinimalReversedCard]) @Deck
             & cutMethodology @(FileMap Rel [Config.MinimalReversedCard])
                              @(FileMap Rel [RMinimalNoteVF])
                              @Deck
@@ -290,7 +290,7 @@ main = do
                 & runMethodologyPure @[RMinimalNoteVF] @Text renderNotes
               & runMethodologyPure @(FileMap Rel [RMinimalNoteVF]) @[Path Rel File] getMedias
               & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
-          & separateMethodologyTerminal @(FileMap Rel [Config.BasicReversedCard]) @DeckSplit @Deck
+          & separateMethodologyTerminal @(FileMap Rel [Config.BasicReversedCard]) @Deck
             & cutMethodology @(FileMap Rel [Config.BasicReversedCard])
                              @(FileMap Rel [RBasicReversedNoteVF])
                              @Deck
@@ -304,7 +304,7 @@ main = do
                & runMethodologyPure @[RBasicReversedNoteVF] @Text renderNotes
              & runMethodologyPure @(FileMap Rel [RBasicReversedNoteVF]) @[Path Rel File] getMedias
              & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
-        & separateMethodologyTerminal @(FileMap Rel [Config.ExcerptSpec]) @DeckSplit @Deck
+        & separateMethodologyTerminal @(FileMap Rel [Config.ExcerptSpec]) @Deck
           & cutMethodology @(FileMap Rel [Config.ExcerptSpec])
                            @(FileMap Rel [RExcerptNote])
                            @Deck
@@ -319,7 +319,7 @@ main = do
                & runMethodologyPure @[RExcerptNote] @Text renderNotes
              & runMethodologyPure @(FileMap Rel [RExcerptNote]) @[Path Rel File] getMedias
              & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
-        & separateMethodologyTerminal @(Map (Path Rel File) [Config.PronunciationSpec]) @DeckSplit @Deck
+        & separateMethodologyTerminal @(Map (Path Rel File) [Config.PronunciationSpec]) @Deck
           & cutMethodology @(FileMap Rel [Config.PronunciationSpec])
                            @(FileMap Rel [RForvoNote])
                            @Deck
