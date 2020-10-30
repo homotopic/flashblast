@@ -82,6 +82,27 @@ packages:
   original:
     hackage: polysemy-methodology-0.1.2.0
 - completed:
+    hackage: polysemy-fskvstore-0.1.0.0@sha256:c44344eba2b1e7a912c1252501ad351e81cd5f43d0c709c7d11e448f80a486d8,896
+    pantry-tree:
+      size: 327
+      sha256: bf54e5fc44c8c6e387cc0bb29686d591e17c567225ded8a6a3e5730cbb3b65e0
+  original:
+    hackage: polysemy-fskvstore-0.1.0.0
+- completed:
+    hackage: polysemy-path-0.0.1.0@sha256:d985ebbceda2032428656e066ac2caf9c25fd3efb12bc3f7c5164e42494e7675,845
+    pantry-tree:
+      size: 270
+      sha256: be876f1d6a2dc678f97699d994928843d4540294d5a358493bfa02392f200f03
+  original:
+    hackage: polysemy-path-0.0.1.0
+- completed:
+    hackage: polysemy-extra-0.1.0.0@sha256:18782fba149f5c41d0da00e3b316acb75ebfd65b7a36218556b96c0b49efdd5a,839
+    pantry-tree:
+      size: 273
+      sha256: a3fc750cc693bc242879afe95ae88ed530f96b90479aee97941486217fc60c9a
+  original:
+    hackage: polysemy-extra-0.1.0.0
+- completed:
     hackage: formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
     pantry-tree:
       size: 1256

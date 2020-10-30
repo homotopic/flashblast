@@ -23,6 +23,7 @@ import           Polysemy.Output
 import           Polysemy.Several
 import           Polysemy.Video                              hiding (to)
 import           RIO.Time
+import Polysemy.FSKVStore
 
 import           FlashBlast.ClozeParse
 import qualified FlashBlast.Config                           as Config
@@ -30,8 +31,6 @@ import           FlashBlast.Conventions
 import           FlashBlast.Domain
 import           FlashBlast.ForvoClient                      hiding (id)
 import           FlashBlast.FS
-import           FlashBlast.JSONFileStore
-import           FlashBlast.KVStore
 import           FlashBlast.YouTubeDL
 import qualified Formatting                                  as F
 import           Formatting.Time
@@ -124,7 +123,7 @@ downloadMP3For l@(Locale l') t = do
       []     -> return Nothing
       (x':_) -> Just <$> mP3For x'
 
-getForvo :: Members '[ FSKVStore Rel
+getForvo :: Members '[ FSKVStore Rel ByteString
                      , ForvoClient] r
          => Locale -> Text -> Path Rel File -> Sem r ()
 getForvo l t f = do

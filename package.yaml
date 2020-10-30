@@ -75,6 +75,7 @@ dependencies:
 - path-dhall-instance
 - path-utils
 - polysemy
+- polysemy-fskvstore
 - polysemy-methodology
 - polysemy-plugin
 - polysemy-video >= 0.1.1.0
