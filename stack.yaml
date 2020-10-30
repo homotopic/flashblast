@@ -15,4 +15,4 @@ extra-deps:
 - polysemy-methodology-0.1.2.0
 - formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
 nix:
-  packages: [zlib, libffi, ffmpeg, pkg-config]
+  packages: [zlib, libffi, ffmpeg, pkg-config, icu]
