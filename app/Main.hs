@@ -30,6 +30,7 @@ import qualified FlashBlast.Config                           as Config
 import           FlashBlast.Conventions
 import           FlashBlast.Domain
 import           FlashBlast.ForvoClient                      hiding (id)
+import Data.Functor.Contravariant
 import           FlashBlast.FS
 import           FlashBlast.YouTubeDL
 import qualified Formatting                                  as F
@@ -38,7 +39,7 @@ import           Optics
 import           Polysemy.Methodology
 import           Polysemy.State
 import           Polysemy.Tagged
-import           RIO                                         hiding (Builder, trace,
+import           RIO                                         hiding (Builder, trace, log,
                                                               logInfo, over, to,
                                                               view,
                                                               writeFileUtf8,
@@ -243,6 +244,62 @@ renderDeck = divideMethodology @(FileMap Rel [p])
               >>> runMethodologyPure @(FileMap Rel [p]) @[Path Rel File] getMedias
                >>> runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
 
+newtype AnalysisStart p = AnalysisStart p
+  deriving (Eq, Show, Generic)
+
+msgAnalysisStartDeckConfig :: AnalysisStart (Text, Config.Deck) -> Text
+msgAnalysisStartDeckConfig (AnalysisStart (n, d)) = F.sformat ("Analysing Deck: " F.% F.stext) n
+
+newtype AnalysisComplete p = AnalysisComplete p
+  deriving (Eq, Show, Generic)
+
+msgAnalysisCompleteDeckConfig :: AnalysisComplete (Text, Config.Deck) -> Text
+msgAnalysisCompleteDeckConfig (AnalysisComplete (n, d)) = F.sformat ("Analysis Complete " F.% F.stext) n
+
+data ExtractingSpecs p = ExtractingSpecs
+
+newtype SpecExtractionComplete p = SpecExtractionComplete (FileMap Rel [p])
+
+-- | `Trace` a `String` based on the input to a `Methodology`.
+logMethodologyStart :: forall b c p r a.
+                       Members '[Methodology b c,
+                                 Log p] r
+                       => (b -> p)
+                       -> Sem r a
+                       -> Sem r a
+logMethodologyStart f = intercept \case
+  Process b -> log (f b) >> process @b @c b
+
+
+-- | `Trace` a `String` based on the output to a `Methodology`.
+logMethodologyEnd :: forall b c q r a.
+                       Members '[Methodology b c,
+                                Log q] r
+                       => (c -> q)
+                       -> Sem r a
+                       -> Sem r a
+logMethodologyEnd f = intercept \case
+  Process b -> do
+    c <- process @b @c b
+    log $ f c
+    return c
+
+-- | `Trace` both the start and the end of a `Methodology`.
+logMethodologyAround :: forall b c p q r a.
+                           Members '[Methodology b c,
+                                     Log p
+                                    , Log q] r
+                       => (b -> p)
+                       -> (c -> q)
+                       -> Sem r a
+                       -> Sem r a
+logMethodologyAround f g = intercept \case
+  Process b -> do
+    log $ f b
+    c <- process @b @c b
+    log $ g c
+    return c
+
 main :: IO ()
 main = do
   Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
@@ -254,9 +311,9 @@ main = do
       & runOutputSem writeOutDeck
       & untag @ConstructionMethodology
         & decomposeMethodology @Config.Deck @DeckSplit @Deck
-        & traceMethodologyAround @Config.Deck @(HList DeckSplit)
-            (const $ T.unpack $ "Analysing Deck: " <> n)
-            (const $ T.unpack $ "Finished Analysing Deck: " <> n)
+        & logMethodologyAround @Config.Deck @(HList DeckSplit)
+            (const $ AnalysisStart (n, x))
+            (const $ AnalysisComplete (n, x))
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
             & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
              (const "Extracting Minimal Reversed Card Specs")
@@ -346,5 +403,7 @@ main = do
         & runError @JSONException
         & runError @BadRequestException
         & interpretFFMpegCli
+        & runLogAction (logTextStderr >$$< msgAnalysisStartDeckConfig)
+        & runLogAction (logTextStderr >$$< msgAnalysisCompleteDeckConfig)
         & traceToIO
         & runM
