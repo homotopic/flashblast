@@ -38,7 +38,7 @@ import           Optics
 import           Polysemy.Methodology
 import           Polysemy.State
 import           Polysemy.Tagged
-import           RIO                                         hiding (Builder,
+import           RIO                                         hiding (Builder, trace,
                                                               logInfo, over, to,
                                                               view,
                                                               writeFileUtf8,
@@ -47,6 +47,7 @@ import           RIO.List
 import qualified RIO.Map                                     as Map
 import qualified RIO.Text                                    as T
 import qualified Text.Subtitles.SRT                          as SR
+import Polysemy.Trace
 
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
@@ -225,10 +226,27 @@ writeOutDeck Deck{..} = do
   createDirectory _notes
   forM_ (Map.toList notes) $ \(x, k) ->  writeFileUtf8 (_notes </> x) k
 
+renderDeck :: forall p r a.
+             (HasMedia p, RenderNote p)
+           => Sem (Methodology (FileMap Rel [p]) Deck
+                 : Methodology (FileMap Rel [p]) (FileMap Rel Text)
+                 : Methodology [p] Text
+                 : Methodology (FileMap Rel [p]) [Path Rel File]
+                 : Methodology (FileMap Rel Text, [Path Rel File]) Deck : r) a
+           -> Sem r a
+renderDeck = divideMethodology @(FileMap Rel [p])
+                                 @(FileMap Rel Text)
+                                 @[Path Rel File]
+                                 @Deck
+            >>> fmapMethodology @(FileMap Rel) @[p] @Text
+             >>> runMethodologyPure @[p] @Text renderNotes
+              >>> runMethodologyPure @(FileMap Rel [p]) @[Path Rel File] getMedias
+               >>> runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+
 main :: IO ()
 main = do
   Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
-  forM_ _decks $ \x -> do
+  forM_ (Map.toList _decks) $ \(n, x) -> do
     flashblast @Config.Deck @Deck
       & untag @DeckConfiguration
       & runInputConst x
@@ -236,73 +254,80 @@ main = do
       & runOutputSem writeOutDeck
       & untag @ConstructionMethodology
         & decomposeMethodology @Config.Deck @DeckSplit @Deck
+        & traceMethodologyAround @Config.Deck @(HList DeckSplit)
+            (const $ T.unpack $ "Analysing Deck: " <> n)
+            (const $ T.unpack $ "Finished Analysing Deck: " <> n)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
+            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
+             (const "Extracting Minimal Reversed Card Specs")
+             (\c -> "Found " <> show (length c) <> " Minimal Card specs.")
             & runMethodologyPure (extractParts Config._MinimalReversed)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.BasicReversedCard])
+            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.BasicReversedCard])
+             (const "Extracting Basic Reversed Card Specs")
+             (\c -> "Found " <> show (length c) <> " Basic Card specs.")
             & runMethodologyPure (extractParts Config._BasicReversed)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
+            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
+             (const "Extracting Excerpt Specs")
+             (\c -> "Found " <> show (length c) <> " Excerpt specs.")
             & runMethodologyPure (extractParts Config._Excerpt)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
+            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
+             (const "Extracting Pronunciation Specs")
+             (\c -> "Found " <> show (length c) <> " Pronunciation specs.")
             & runMethodologyPure (extractParts Config._Pronunciation)
           & endMethodologyInitial
           & separateMethodologyTerminal @(FileMap Rel [Config.MinimalReversedCard]) @Deck
+            & traceMethodologyStart @(FileMap Rel [Config.MinimalReversedCard]) @Deck
+             (const "Constructing Minimal Reversed notes")
             & cutMethodology @(FileMap Rel [Config.MinimalReversedCard])
                              @(FileMap Rel [RMinimalNoteVF])
                              @Deck
+            & traceMethodologyEnd @(FileMap Rel [Config.MinimalReversedCard])
+                                  @(FileMap Rel [RMinimalNoteVF])
+              (\c -> "Produced " <> show (length $ foldr (++) [] c) <> " notes.")
             & fmap2Methodology @(FileMap Rel) @[] @Config.MinimalReversedCard @RMinimalNoteVF
               & runMethodologyPure generateMinimalReversedNoteVF
-            & divideMethodology @(FileMap Rel [RMinimalNoteVF])
-                                @(FileMap Rel Text)
-                                @[Path Rel File]
-                                @Deck
-              & fmapMethodology @(FileMap Rel) @[RMinimalNoteVF] @Text
-                & runMethodologyPure @[RMinimalNoteVF] @Text renderNotes
-              & runMethodologyPure @(FileMap Rel [RMinimalNoteVF]) @[Path Rel File] getMedias
-              & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+            & renderDeck @RMinimalNoteVF
           & separateMethodologyTerminal @(FileMap Rel [Config.BasicReversedCard]) @Deck
+            & traceMethodologyStart @(FileMap Rel [Config.BasicReversedCard]) @Deck
+             (const "Constructing Basic Reversed notes")
             & cutMethodology @(FileMap Rel [Config.BasicReversedCard])
                              @(FileMap Rel [RBasicReversedNoteVF])
                              @Deck
+            & traceMethodologyEnd @(FileMap Rel [Config.BasicReversedCard])
+                                  @(FileMap Rel [RBasicReversedNoteVF])
+              (\c -> "Produced " <> show (length $ foldr (++) [] c) <> " notes.")
               & fmap2Methodology @(FileMap Rel) @[] @Config.BasicReversedCard @RBasicReversedNoteVF
                 & runMethodologyPure generateBasicReversedNoteVF
-            & divideMethodology @(FileMap Rel [RBasicReversedNoteVF])
-                                @(FileMap Rel Text)
-                                @[Path Rel File]
-                                @Deck
-             & fmapMethodology @(FileMap Rel) @[RBasicReversedNoteVF] @Text
-               & runMethodologyPure @[RBasicReversedNoteVF] @Text renderNotes
-             & runMethodologyPure @(FileMap Rel [RBasicReversedNoteVF]) @[Path Rel File] getMedias
-             & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+              & renderDeck @RBasicReversedNoteVF
         & separateMethodologyTerminal @(FileMap Rel [Config.ExcerptSpec]) @Deck
+            & traceMethodologyStart @(FileMap Rel [Config.ExcerptSpec]) @Deck
+             (const "Constructing Excerpt notes")
           & cutMethodology @(FileMap Rel [Config.ExcerptSpec])
                            @(FileMap Rel [RExcerptNote])
                            @Deck
+            & traceMethodologyEnd @(FileMap Rel [Config.ExcerptSpec])
+                                  @(FileMap Rel [RExcerptNote])
+              (\c -> "Produced " <> show (length $ foldr (++) [] c) <> " notes.")
             & fmapMethodology @(FileMap Rel) @[Config.ExcerptSpec] @[RExcerptNote]
               & bindMethodology @[] @Config.ExcerptSpec @RExcerptNote
                 & runMethodologySem @Config.ExcerptSpec @[RExcerptNote] runExcerptSpecIO
-            & divideMethodology @(FileMap Rel [RExcerptNote])
-                                @(FileMap Rel Text)
-                                @[Path Rel File]
-                                @Deck
-             & fmapMethodology @(FileMap Rel) @[RExcerptNote] @Text
-               & runMethodologyPure @[RExcerptNote] @Text renderNotes
-             & runMethodologyPure @(FileMap Rel [RExcerptNote]) @[Path Rel File] getMedias
-             & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+            & renderDeck @RExcerptNote
         & separateMethodologyTerminal @(Map (Path Rel File) [Config.PronunciationSpec]) @Deck
+            & traceMethodologyStart @(FileMap Rel [Config.PronunciationSpec]) @Deck
+             (const "Constructing Pronunciation notes")
           & cutMethodology @(FileMap Rel [Config.PronunciationSpec])
                            @(FileMap Rel [RForvoNote])
                            @Deck
+            & traceMethodologyEnd @(FileMap Rel [Config.PronunciationSpec])
+                                  @(FileMap Rel [RForvoNote])
+              (\c -> "Produced " <> show (length $ foldr (++) [] c) <> " notes.")
             & fmapMethodology @(FileMap Rel) @[Config.PronunciationSpec] @[RForvoNote]
               & bindMethodology @[] @Config.PronunciationSpec @RForvoNote
                & runMethodologySem runPronunciationSpecIO
-            & divideMethodology @(FileMap Rel [RForvoNote])
-                                @(FileMap Rel Text)
-                                @[Path Rel File]
-                                @Deck
-             & fmapMethodology @(FileMap Rel) @[RForvoNote] @Text
-               & runMethodologyPure @[RForvoNote] @Text renderNotes
-             & runMethodologyPure @(FileMap Rel [RForvoNote]) @[Path Rel File] getMedias
-             & runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+               & renderDeck @RForvoNote
         & endMethodologyTerminal
         & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
         & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
@@ -321,4 +346,5 @@ main = do
         & runError @JSONException
         & runError @BadRequestException
         & interpretFFMpegCli
+        & traceToIO
         & runM

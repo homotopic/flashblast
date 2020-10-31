@@ -54,12 +54,12 @@ packages:
   original:
     hackage: unliftio-path-0.0.2.0
 - completed:
-    hackage: polysemy-video-0.1.1.0@sha256:40e77abb8e85aabdeb265d4a1b1a2c8256b0dcba825d8aa4db52737fecb9f47c,991
+    hackage: polysemy-video-0.1.2.0@sha256:15df179ec830b40c05153d8468756b3d1e0db5b8a179cd57af1a13b9a4299c05,991
     pantry-tree:
       size: 273
-      sha256: 99b3dba1a8c5266485514c7ac97125ff01614923752581ad8305ad1259f00f51
+      sha256: b2585aa242c670b3471ecb19c4e66c3c464b56600aa85234519d5994fa0fd295
   original:
-    hackage: polysemy-video-0.1.1.0
+    hackage: polysemy-video-0.1.2.0
 - completed:
     hackage: polysemy-zoo-0.7.0.1@sha256:60c2921df95f61d43222a75adde4f330e9510320b416132838a354cd81b4bcc5,3846
     pantry-tree:
@@ -75,12 +75,12 @@ packages:
   original:
     hackage: co-log-polysemy-formatting-0.1.0.0
 - completed:
-    hackage: polysemy-methodology-0.1.2.0@sha256:ff1f9246240b5975648e0dba97cdf8b0976b72e3624d92ad6045f818e1b95c8c,971
+    hackage: polysemy-methodology-0.1.3.2@sha256:dcba9e33d11e83adfc795662d05bf1a4fc07813172f68ec3f8b116f921a4570a,971
     pantry-tree:
-      size: 286
-      sha256: 47681b9fb2de8a81829c28ca2783128a86cc432da982f679eac46dce9dec6b03
+      size: 287
+      sha256: 4d1ce512d3c26178ad0cee489bbf70cecae73f98920ca68693a8c975517812b9
   original:
-    hackage: polysemy-methodology-0.1.2.0
+    hackage: polysemy-methodology-0.1.3.2
 - completed:
     hackage: polysemy-fskvstore-0.1.0.0@sha256:c44344eba2b1e7a912c1252501ad351e81cd5f43d0c709c7d11e448f80a486d8,896
     pantry-tree:
