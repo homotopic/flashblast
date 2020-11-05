@@ -1,5 +1,13 @@
 # Changelog for flashblast
 
+## (v0.0.6.0)
+
+* Add basic colog via methodology transformations.
+
+## (v0.0.5.0)
+
+* Introduce polysemy-methodology.
+
 ## (v0.0.4.0)
 
 * Add basic Forvo Client.
