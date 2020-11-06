@@ -31,8 +31,8 @@ import           FlashBlast.Conventions
 import           FlashBlast.Domain
 import           FlashBlast.ForvoClient                      hiding (id)
 import Data.Functor.Contravariant
-import           FlashBlast.FS
 import           FlashBlast.YouTubeDL
+import Polysemy.FS
 import qualified Formatting                                  as F
 import           Formatting.Time
 import           Optics
@@ -388,12 +388,12 @@ main = do
         & endMethodologyTerminal
         & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
         & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
-        & runFSWriteIO
-        & runFSDirIO
-        & runFSCopyIO
-        & runFSExistIO
-        & runFSTempIO
-        & runFSReadIO
+        & runFSWrite
+        & runFSDir
+        & runFSCopy
+        & runFSExist
+        & runFSTemp
+        & runFSRead
         & interpretYouTubeDL
         & runError @SubtitleParseException
         & runError @ForvoLimitReachedException

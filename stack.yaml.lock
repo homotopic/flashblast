@@ -103,6 +103,13 @@ packages:
   original:
     hackage: polysemy-extra-0.1.0.0
 - completed:
+    hackage: polysemy-fs-0.1.0.0@sha256:6027628e5009699e7948efc2b8320a2d5e3f0c9976587da82202d2418dfc604b,898
+    pantry-tree:
+      size: 267
+      sha256: 06e6b8e30ae3a3a04b4aadaa2cbdc38a386dbcbf3253001e6ed5f7ac2ae15d73
+  original:
+    hackage: polysemy-fs-0.1.0.0
+- completed:
     hackage: formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
     pantry-tree:
       size: 1256
