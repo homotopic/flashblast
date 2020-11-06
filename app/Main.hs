@@ -260,46 +260,6 @@ data ExtractingSpecs p = ExtractingSpecs
 
 newtype SpecExtractionComplete p = SpecExtractionComplete (FileMap Rel [p])
 
--- | `Trace` a `String` based on the input to a `Methodology`.
-logMethodologyStart :: forall b c p r a.
-                       Members '[Methodology b c,
-                                 Log p] r
-                       => (b -> p)
-                       -> Sem r a
-                       -> Sem r a
-logMethodologyStart f = intercept \case
-  Process b -> log (f b) >> process @b @c b
-
-
--- | `Trace` a `String` based on the output to a `Methodology`.
-logMethodologyEnd :: forall b c q r a.
-                       Members '[Methodology b c,
-                                Log q] r
-                       => (c -> q)
-                       -> Sem r a
-                       -> Sem r a
-logMethodologyEnd f = intercept \case
-  Process b -> do
-    c <- process @b @c b
-    log $ f c
-    return c
-
--- | `Trace` both the start and the end of a `Methodology`.
-logMethodologyAround :: forall b c p q r a.
-                           Members '[Methodology b c,
-                                     Log p
-                                    , Log q] r
-                       => (b -> p)
-                       -> (c -> q)
-                       -> Sem r a
-                       -> Sem r a
-logMethodologyAround f g = intercept \case
-  Process b -> do
-    log $ f b
-    c <- process @b @c b
-    log $ g c
-    return c
-
 main :: IO ()
 main = do
   Config.FlashBlast{..} <- D.input D.auto "./index.dhall"

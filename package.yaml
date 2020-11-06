@@ -77,7 +77,7 @@ dependencies:
 - polysemy
 - polysemy-fs
 - polysemy-fskvstore
-- polysemy-methodology
+- polysemy-methodology >= 0.1.5.0
 - polysemy-plugin
 - polysemy-video >= 0.1.1.0
 - polysemy-zoo
