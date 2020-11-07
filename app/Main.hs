@@ -39,7 +39,7 @@ import           Optics
 import           Polysemy.Methodology
 import           Polysemy.State
 import           Polysemy.Tagged
-import           RIO                                         hiding (Builder, trace, log,
+import           RIO                                         hiding (Builder, trace, log, Display,
                                                               logInfo, over, to,
                                                               view,
                                                               writeFileUtf8,
@@ -244,21 +244,51 @@ renderDeck = divideMethodology @(FileMap Rel [p])
               >>> runMethodologyPure @(FileMap Rel [p]) @[Path Rel File] getMedias
                >>> runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
 
-newtype AnalysisStart p = AnalysisStart p
-  deriving (Eq, Show, Generic)
+data EventType = Analysis | Extract
 
-msgAnalysisStartDeckConfig :: AnalysisStart (Text, Config.Deck) -> Text
-msgAnalysisStartDeckConfig (AnalysisStart (n, d)) = F.sformat ("Analysing Deck: " F.% F.stext) n
+data Indicator = Start | Complete
 
-newtype AnalysisComplete p = AnalysisComplete p
-  deriving (Eq, Show, Generic)
+data Event (k :: EventType) (t :: Indicator) a = Event a
 
-msgAnalysisCompleteDeckConfig :: AnalysisComplete (Text, Config.Deck) -> Text
-msgAnalysisCompleteDeckConfig (AnalysisComplete (n, d)) = F.sformat ("Analysis Complete " F.% F.stext) n
+log_msg_analysing_deck :: Config.Deckname -> Text
+log_msg_analysing_deck = F.sformat ("Analysing Deck: " F.% F.stext)
 
-data ExtractingSpecs p = ExtractingSpecs
+log_msg_deck_analysis_complete :: Config.Deckname -> Text
+log_msg_deck_analysis_complete = F.sformat ("Analysis Complete For Deck: " F.% F.stext)
 
-newtype SpecExtractionComplete p = SpecExtractionComplete (FileMap Rel [p])
+class Display a where
+  display :: a -> Text
+
+instance Display (Prism' Config.Spec [Config.MinimalReversedCard]) where
+  display = const "Minimal Reversed Card Specs"
+
+instance Display (Prism' Config.Spec [Config.BasicReversedCard]) where
+  display = const "Basic Reversed Card Specs"
+
+log_msg_extracting_specs :: Display (Prism' Config.Spec x) => Prism' Config.Spec x -> Text
+log_msg_extracting_specs = F.sformat ("Extracting " F.% F.stext) . Main.display
+
+log_msg_spec_extraction_complete :: Display (Prism' Config.Spec x) => Prism' Config.Spec x -> Int -> Text
+log_msg_spec_extraction_complete x y = F.sformat ("Found " F.% F.int F.% " " F.% F.stext) y (Main.display x)
+
+msgAnalysisStartDeckConfig :: Event 'Analysis 'Start Config.Deckname -> Text
+msgAnalysisStartDeckConfig (Event n) = log_msg_analysing_deck n
+
+msgAnalysisCompleteDeckConfig :: Event 'Analysis 'Complete Config.Deckname -> Text
+msgAnalysisCompleteDeckConfig (Event n) = log_msg_deck_analysis_complete n
+
+msgExtractionStartDeckConfig :: Display (Prism' Config.Spec x) => Event 'Extract 'Start (Prism' Config.Spec x) -> Text
+msgExtractionStartDeckConfig (Event n) = log_msg_extracting_specs n
+
+msgExtractionCompleteDeckConfig :: Display (Prism' Config.Spec x)
+                                => Event 'Extract 'Complete ((Prism' Config.Spec x, FileMap Rel x))
+                                -> Text
+msgExtractionCompleteDeckConfig (Event (n, c)) = log_msg_spec_extraction_complete n (length c)
+
+
+data Cut (a :: k1) (b :: k2) (c :: k3)
+
+
 
 main :: IO ()
 main = do
@@ -272,27 +302,27 @@ main = do
       & untag @ConstructionMethodology
         & decomposeMethodology @Config.Deck @DeckSplit @Deck
         & logMethodologyAround @Config.Deck @(HList DeckSplit)
-            (const $ AnalysisStart (n, x))
-            (const $ AnalysisComplete (n, x))
+            (const $ Event @'Analysis @'Start n)
+            (const $ Event @'Analysis @'Complete n)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
-            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
-             (const "Extracting Minimal Reversed Card Specs")
-             (\c -> "Found " <> show (length c) <> " Minimal Card specs.")
+            & logMethodologyAround @Config.Deck @(FileMap Rel [Config.MinimalReversedCard])
+              (const $ Event @'Extract @'Start Config._MinimalReversed)
+              (Event @'Extract @'Complete . (Config._MinimalReversed,))
             & runMethodologyPure (extractParts Config._MinimalReversed)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.BasicReversedCard])
-            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.BasicReversedCard])
-             (const "Extracting Basic Reversed Card Specs")
-             (\c -> "Found " <> show (length c) <> " Basic Card specs.")
+            & logMethodologyAround @Config.Deck @(FileMap Rel [Config.BasicReversedCard])
+              (const $ Event @'Extract @'Start Config._BasicReversed)
+              (Event @'Extract @'Complete . (Config._BasicReversed,))
             & runMethodologyPure (extractParts Config._BasicReversed)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
-            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
-             (const "Extracting Excerpt Specs")
-             (\c -> "Found " <> show (length c) <> " Excerpt specs.")
+            & logMethodologyAround @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
+              (const $ Event @'Extract @'Start Config._Excerpt)
+              (Event @'Extract @'Complete . (Config._Excerpt,))
             & runMethodologyPure (extractParts Config._Excerpt)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
-            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
-             (const "Extracting Pronunciation Specs")
-             (\c -> "Found " <> show (length c) <> " Pronunciation specs.")
+            & logMethodologyAround @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
+              (const $ Event @'Extract @'Start Config._Pronunciation)
+              (Event @'Extract @'Complete . (Config._Pronunciation,))
             & runMethodologyPure (extractParts Config._Pronunciation)
           & endMethodologyInitial
           & separateMethodologyTerminal @(FileMap Rel [Config.MinimalReversedCard]) @Deck
@@ -365,5 +395,9 @@ main = do
         & interpretFFMpegCli
         & runLogAction (logTextStderr >$$< msgAnalysisStartDeckConfig)
         & runLogAction (logTextStderr >$$< msgAnalysisCompleteDeckConfig)
+        & runLogAction (logTextStderr >$$< msgExtractionStartDeckConfig @[Config.MinimalReversedCard])
+        & runLogAction (logTextStderr >$$< msgExtractionCompleteDeckConfig @[Config.MinimalReversedCard])
+        & runLogAction (logTextStderr >$$< msgExtractionStartDeckConfig @[Config.BasicReversedCard])
+        & runLogAction (logTextStderr >$$< msgExtractionCompleteDeckConfig @[Config.BasicReversedCard])
         & traceToIO
         & runM

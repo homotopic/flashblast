@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           flashblast
-version:        0.0.6.0
+version:        0.0.7.0
 synopsis:       Generate language learning flashcards from video.
 author:         Daniel Firth
 maintainer:     dan.firth@homotopic.tech
@@ -58,7 +58,7 @@ library
     , polysemy
     , polysemy-fs
     , polysemy-fskvstore
-    , polysemy-methodology
+    , polysemy-methodology >=0.1.5.0
     , polysemy-plugin
     , polysemy-video >=0.1.1.0
     , polysemy-zoo
@@ -106,7 +106,7 @@ executable flashblast
     , polysemy
     , polysemy-fs
     , polysemy-fskvstore
-    , polysemy-methodology
+    , polysemy-methodology >=0.1.5.0
     , polysemy-plugin
     , polysemy-video >=0.1.1.0
     , polysemy-zoo

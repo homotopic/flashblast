@@ -151,8 +151,10 @@ data Deck = Deck {
 
 makeFieldsNoPrefix ''Deck
 
+type Deckname = Text
+
 data FlashBlast = FlashBlast {
-  _decks       :: Map Text Deck
+  _decks       :: Map Deckname Deck
 , _forvoApiKey :: Maybe ForvoAPIKey
 } deriving stock Generic
   deriving D.FromDhall

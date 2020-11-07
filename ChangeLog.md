@@ -1,5 +1,9 @@
 # Changelog for flashblast
 
+## (v0.0.7.0)
+
+* Depend on polysemy-fs.
+
 ## (v0.0.6.0)
 
 * Add basic colog via methodology transformations.

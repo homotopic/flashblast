@@ -32,3 +32,4 @@ flashblast = do
   x <- tag @DeckConfiguration input
   k <- tag @ConstructionMethodology $ process x
   tag @CollectionsPackage $ output k
+
