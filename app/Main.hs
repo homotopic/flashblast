@@ -37,7 +37,6 @@ import qualified Formatting                                  as F
 import           Formatting.Time
 import           Optics
 import           Polysemy.Methodology
-import           Polysemy.State
 import           Polysemy.Tagged
 import           RIO                                         hiding (Builder, trace, log, Display,
                                                               logInfo, over, to,
@@ -153,8 +152,7 @@ renderThreadTimeMessage' (LogEnv useColor zone) (ThreadTimeMessage threadId time
     ]
 
 
-runMultiClozeSpecIO :: Members '[ Input Config.ResourceDirs
-                                , FSWrite
+runMultiClozeSpecIO :: Members '[ FSWrite
                                 , FSRead
                                 , FSExist
                                 , FSDir] m
@@ -163,7 +161,6 @@ runMultiClozeSpecIO :: Members '[ Input Config.ResourceDirs
                     -> Config.MultiClozeSpec
                     -> Sem m [RForvoNote]
 runMultiClozeSpecIO f s (Config.MultiClozeSpec p is) = do
-    Config.ResourceDirs{..} <- input @Config.ResourceDirs
     forM p \a -> let (bs, cs) = genClozePhrase a
                  in return $ genForvos bs is (map f cs)
 
@@ -227,22 +224,14 @@ writeOutDeck Deck{..} = do
   createDirectory _notes
   forM_ (Map.toList notes) $ \(x, k) ->  writeFileUtf8 (_notes </> x) k
 
-renderDeck :: forall p r a.
-             (HasMedia p, RenderNote p)
-           => Sem (Methodology (FileMap Rel [p]) Deck
-                 : Methodology (FileMap Rel [p]) (FileMap Rel Text)
-                 : Methodology [p] Text
-                 : Methodology (FileMap Rel [p]) [Path Rel File]
-                 : Methodology (FileMap Rel Text, [Path Rel File]) Deck : r) a
+renderDeck :: forall p r a. (HasMedia p, RenderNote p)
+           => Sem (Methodology (FileMap Rel [p]) Deck : r) a
            -> Sem r a
-renderDeck = divideMethodology @(FileMap Rel [p])
-                                 @(FileMap Rel Text)
-                                 @[Path Rel File]
-                                 @Deck
-            >>> fmapMethodology @(FileMap Rel) @[p] @Text
-             >>> runMethodologyPure @[p] @Text renderNotes
-              >>> runMethodologyPure @(FileMap Rel [p]) @[Path Rel File] getMedias
-               >>> runMethodologyPure @(FileMap Rel Text, [Path Rel File]) @Deck (uncurry Deck)
+renderDeck = divideMethodology'
+         >>> fmapMethodology'
+         >>> runMethodologyPure renderNotes
+         >>> runMethodologyPure getMedias
+         >>> runMethodologyPure (uncurry Deck)
 
 data EventType = Analysis | Extract
 
@@ -285,11 +274,6 @@ msgExtractionCompleteDeckConfig :: Display (Prism' Config.Spec x)
                                 -> Text
 msgExtractionCompleteDeckConfig (Event (n, c)) = log_msg_spec_extraction_complete n (length c)
 
-
-data Cut (a :: k1) (b :: k2) (c :: k3)
-
-
-
 main :: IO ()
 main = do
   Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
@@ -315,14 +299,14 @@ main = do
               (Event @'Extract @'Complete . (Config._BasicReversed,))
             & runMethodologyPure (extractParts Config._BasicReversed)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
-            & logMethodologyAround @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
-              (const $ Event @'Extract @'Start Config._Excerpt)
-              (Event @'Extract @'Complete . (Config._Excerpt,))
+            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.ExcerptSpec])
+              (const "Extracting Excerpt Specs")
+              (\c -> "Found " <> show (length c) <> " Excerpt specs.")
             & runMethodologyPure (extractParts Config._Excerpt)
           & separateMethodologyInitial @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
-            & logMethodologyAround @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
-              (const $ Event @'Extract @'Start Config._Pronunciation)
-              (Event @'Extract @'Complete . (Config._Pronunciation,))
+            & traceMethodologyAround @Config.Deck @(FileMap Rel [Config.PronunciationSpec])
+              (const "Extracting Pronunciation Specs")
+              (\c -> "Found " <> show (length c) <> " Pronunciation specs.")
             & runMethodologyPure (extractParts Config._Pronunciation)
           & endMethodologyInitial
           & separateMethodologyTerminal @(FileMap Rel [Config.MinimalReversedCard]) @Deck
