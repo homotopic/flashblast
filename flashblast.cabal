@@ -45,6 +45,7 @@ library
     , comonad
     , composite-base
     , dhall
+    , first-class-families
     , formatting
     , generic-monoid
     , ghc-clippy-plugin
@@ -96,6 +97,7 @@ executable flashblast
     , comonad
     , composite-base
     , dhall
+    , first-class-families
     , flashblast
     , formatting
     , generic-monoid

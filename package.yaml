@@ -66,6 +66,7 @@ dependencies:
 - comonad
 - composite-base
 - dhall
+- first-class-families
 - formatting
 - generic-monoid
 - ghc-clippy-plugin

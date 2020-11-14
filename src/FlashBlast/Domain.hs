@@ -7,6 +7,8 @@ Top level domain specification for FlashBlast.
 -}
 module FlashBlast.Domain where
 
+import Data.Kind
+import Fcf
 import RIO
 import Polysemy
 import Polysemy.Input
@@ -33,3 +35,19 @@ flashblast = do
   k <- tag @ConstructionMethodology $ process x
   tag @CollectionsPackage $ output k
 
+-- | Cards can be of the following types.
+data CardType = Minimal | Basic | Excerpt | Pronunciation
+
+-- | They have a way to configure them.
+type family ConfigFor (a :: CardType) :: Type
+
+-- | And a concrete product.
+type family ResultFor (a :: CardType) :: Type
+
+-- | Fcf mapping for CardType to its Config.
+data ConfigFor'  :: CardType -> Exp Type
+type instance Eval (ConfigFor' x) = ConfigFor x
+
+-- | Fcf mapping for CardType to its product.
+data ResultFor'  :: CardType -> Exp Type
+type instance Eval (ResultFor' x) = ResultFor x
