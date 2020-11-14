@@ -141,23 +141,6 @@ getForvo l t f = do
       x' <- downloadMP3For l t
       updateKV f x'
 
-fIso8601 :: FormatTime a => (Color -> Builder -> Builder) -> F.Format r (a -> r)
-fIso8601 withFG = F.later $ \time -> mconcat
-  [ F.bformat dateDash time
-  , withFG Green "T"
-  , withFG Yellow $ F.bformat hms time
-  ]
-
-renderThreadTimeMessage' :: LogEnv -> ThreadTimeMessage -> T.Text
-renderThreadTimeMessage' (LogEnv useColor zone) (ThreadTimeMessage threadId time (Msg severity stack message)) =
-  let withFG = getWithFG useColor
-  in F.sformat (fFieldsGreenBarSep useColor)
-    [ F.bformat (fSeverity withFG) severity
-    , F.bformat (fIso8601 withFG) (utcToZonedTime zone time)
-    , F.bformat F.stext message
-    ]
-
-
 runMultiClozeSpecIO :: Members '[ FSWrite
                                 , FSRead
                                 , FSExist
