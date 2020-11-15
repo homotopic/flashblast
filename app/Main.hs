@@ -37,6 +37,7 @@ import           FlashBlast.ForvoClient                      hiding (id)
 import Data.Functor.Contravariant
 import           FlashBlast.YouTubeDL
 import Polysemy.FS
+import Composite.CoRecord
 import qualified Formatting                                  as F
 import           Formatting.Time
 import           Optics
@@ -54,18 +55,13 @@ import qualified Text.Subtitles.SRT                          as SR
 import Data.Vinyl.Functor
 import Polysemy.Vinyl
 import Polysemy.Trace
+import Data.Vinyl
 
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
 
 fromRange :: SR.Range -> Range
 fromRange (SR.Range f t) = Range (fromTime f) (fromTime t)
-
-fFieldsGreenBarSep :: UseColor -> F.Format r ([Builder] -> r)
-fFieldsGreenBarSep useColor = F.later $ \fields ->
-  let withFG = getWithFG useColor
-      sep = F.format F.builder $ withFG Green " | "
-  in F.bformat (F.intercalated sep F.builder) fields
 
 interpretVideoSource :: Members '[Input Config.ResourceDirs, YouTubeDL] m
                      => Config.VideoSource
@@ -222,6 +218,20 @@ type instance ResultFor 'Pronunciation = RForvoNote
 type PartTypes = Eval (FMap ConfigFor' CardTypes)
 type NoteTypes = Eval (FMap ResultFor' CardTypes)
 
+type AnalysisF = FileMap Rel :. []
+type StagingF  = [] :. Env (Path Rel File) :. []
+type DiffractF = Env (Path Rel File) :. []
+
+
+reduceStaging :: forall (c :: CardType) r a. (ResultFor c) ∈ NoteTypes
+              => Sem (Methodology (StagingF (ConfigFor c)) ([CoRec DiffractF NoteTypes]) ': r) a
+              -> Sem (Methodology (DiffractF (ConfigFor c)) (DiffractF (ResultFor c)) ': r) a
+reduceStaging = cutMethodology' @(StagingF (ConfigFor c))
+                               @[DiffractF (ConfigFor c)]
+            >>> runMethodologyPure getCompose
+            >>> fmapMethodology'
+            >>> pickCoRecConstructor @(ResultFor c)
+
 main :: IO ()
 main = do
   Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
@@ -232,16 +242,16 @@ main = do
       & untag @CollectionsPackage
       & runOutputSem writeOutDeck
       & untag @ConstructionMethodology
-      & diffractMethodology'  @Config.Deck @(Env (Path Rel File) :. []) @NoteTypes @Deck
-      & cutMethodology'       @Config.Deck @(Rec (FileMap Rel :. []) PartTypes)
+      & diffractMethodology'  @Config.Deck @DiffractF @NoteTypes @Deck
+      & cutMethodology'       @Config.Deck @(Rec AnalysisF PartTypes)
       & runRecInitialAsInputCompose'
       & stripRecInput
       & stripRecInput
       & stripRecInput
       & stripRecInput
       & endRecInput
-      & cutMethodology' @(Rec (FileMap Rel :. []) PartTypes)
-                        @(Rec ([] :. (Env (Path Rel File)) :. []) PartTypes)
+      & cutMethodology' @(Rec AnalysisF PartTypes)
+                        @(Rec StagingF PartTypes)
       & runMethodologyRmap (onCompose (fmap Compose . fmap (uncurry env) . Map.toList))
       & stripRecTerminal
       & stripRecTerminal
@@ -270,36 +280,25 @@ main = do
          (Compose . extractParts Config._Excerpt)
       & runInputConstFC @Config.PronunciationSpec
          (Compose . extractParts Config._Pronunciation)
-      & cutMethodology' @(([] :. Env (Path Rel File) :. []) Config.MinimalReversedCard)
-                       @[((Env (Path Rel File) :. []) Config.MinimalReversedCard)]
-      & runMethodologyPure getCompose
-      & fmapMethodology'
-      & pickCoRecConstructor @RMinimalNoteVF
-      & fmapMethodology' @(Env (Path Rel File) :. [])
-      & runMethodologyPure generateMinimalReversedNoteVF
-      & cutMethodology' @(([] :. Env (Path Rel File) :. []) Config.BasicReversedCard)
-                       @[((Env (Path Rel File) :. []) Config.BasicReversedCard)]
-      & runMethodologyPure getCompose
-      & fmapMethodology'
-      & pickCoRecConstructor @RBasicReversedNoteVF
-      & fmapMethodology' @(Env (Path Rel File) :. [])
+
+      & reduceStaging @Minimal
+        & fmapMethodology' @DiffractF
+        & runMethodologyPure generateMinimalReversedNoteVF
+
+      & reduceStaging @Basic
+      & fmapMethodology' @DiffractF
       & runMethodologyPure generateBasicReversedNoteVF
-      & cutMethodology' @(([] :. Env (Path Rel File) :. []) Config.ExcerptSpec)
-                       @[((Env (Path Rel File) :. []) Config.ExcerptSpec)]
-      & runMethodologyPure getCompose
-      & fmapMethodology'
-      & pickCoRecConstructor @RExcerptNote
+
+      & reduceStaging @Excerpt
       & fmapCMethodology
       & bindMethodology'
       & runMethodologySem runExcerptSpecIO
-      & cutMethodology' @(([] :. Env (Path Rel File) :. []) Config.PronunciationSpec)
-                       @[((Env (Path Rel File) :. []) Config.PronunciationSpec)]
-      & runMethodologyPure getCompose
-      & fmapMethodology'
-      & pickCoRecConstructor @RForvoNote
+
+      & reduceStaging @Pronunciation
       & fmapCMethodology
       & bindMethodology'
       & runMethodologySem runPronunciationSpecIO
+
       & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
       & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
       & runFSDir
