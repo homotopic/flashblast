@@ -281,20 +281,20 @@ main = do
       & runInputConstFC @Config.PronunciationSpec
          (Compose . extractParts Config._Pronunciation)
 
-      & reduceStaging @Minimal
+      & reduceStaging @'Minimal
         & fmapMethodology' @DiffractF
         & runMethodologyPure generateMinimalReversedNoteVF
 
-      & reduceStaging @Basic
+      & reduceStaging @'Basic
       & fmapMethodology' @DiffractF
       & runMethodologyPure generateBasicReversedNoteVF
 
-      & reduceStaging @Excerpt
+      & reduceStaging @'Excerpt
       & fmapCMethodology
       & bindMethodology'
       & runMethodologySem runExcerptSpecIO
 
-      & reduceStaging @Pronunciation
+      & reduceStaging @'Pronunciation
       & fmapCMethodology
       & bindMethodology'
       & runMethodologySem runPronunciationSpecIO
