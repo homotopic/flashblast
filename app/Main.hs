@@ -56,6 +56,7 @@ import Data.Vinyl.Functor
 import Polysemy.Vinyl
 import Polysemy.Trace
 import Data.Vinyl
+import FlashBlast.VF
 
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
@@ -109,9 +110,9 @@ runExcerptSpecIO Config.ExcerptSpec {..} = do
   forM (zip4 s' cs es fs) $ \(l, c, e, f) -> do
     whenM (fmap not . doesFileExist $ _images </> f) $
       extractFrames (_clips </> c) [(Time 0 0 0 0, _images </> f)]
-    return $ val @"front" (fst . genClozePhrase . SR.dialog $ l)
-          :& val @"extra" f
-          :& val @"back"  e
+    return $ val @"front" (RawText (fst . genClozePhrase . SR.dialog $ l))
+          :& val @"extra" (Multi [Image f])
+          :& val @"back"  (Audio e)
           :& RNil
 
 newtype SubtitleParseException = SubtitleParseException String
@@ -144,10 +145,10 @@ runMultiClozeSpecIO :: Members '[ FSWrite
                     => (Text -> Path Rel File)
                     -> Maybe Config.ForvoSpec
                     -> Config.MultiClozeSpec
-                    -> Sem m [RForvoNote]
+                    -> Sem m [RPronunciationNote]
 runMultiClozeSpecIO f s (Config.MultiClozeSpec p is) = do
     forM p \a -> let (bs, cs) = genClozePhrase a
-                 in return $ genForvos bs is (map f cs)
+                 in return $ genForvos bs is (map (Audio . f) cs)
 
 runPronunciationSpecIO :: Members '[Input Config.ResourceDirs
                                    , FSWrite
@@ -156,7 +157,7 @@ runPronunciationSpecIO :: Members '[Input Config.ResourceDirs
                                    , FSDir
                                    ] m
                         => Config.PronunciationSpec
-                        -> Sem m [RForvoNote]
+                        -> Sem m [RPronunciationNote]
 runPronunciationSpecIO (Config.PronunciationSpec f ms a) = do
                                                      zs <- forM ms $ runMultiClozeSpecIO f a
                                                      return $ join zs
@@ -168,17 +169,17 @@ data Deck = Deck {
   deriving Semigroup via GenericSemigroup Deck
   deriving Monoid via GenericMonoid Deck
 
-generateMinimalReversedNoteVF :: Config.MinimalReversedCard -> RMinimalNoteVF
+generateMinimalReversedNoteVF :: Config.MinimalReversedCard -> RMinimalNote
 generateMinimalReversedNoteVF Config.MinimalReversedCard{..} = val @"front" _front
                                                             :& val @"back"  _back
                                                             :& RNil
 
-generateBasicReversedNoteVF :: Config.BasicReversedCard -> RBasicReversedNoteVF
-generateBasicReversedNoteVF Config.BasicReversedCard{..} = val @"front"       _front
-                                                        :& val @"front-extra" _front_extra
-                                                        :& val @"back"        _back
-                                                        :& val @"back-extra"  _back_extra
-                                                        :& RNil
+generateBasicReversed :: Config.BasicReversedCard -> RBasicNote
+generateBasicReversed Config.BasicReversedCard{..} = val @"front"       _front
+                                                  :& val @"front-extra" _front_extra
+                                                  :& val @"back"        _back
+                                                  :& val @"back-extra"  _back_extra
+                                                  :& RNil
 
 extractParts :: Prism' Config.Spec x -> Config.Deck -> Map (Path Rel File) x
 extractParts x = Map.fromList . itoListOf
@@ -210,10 +211,10 @@ type instance ConfigFor 'Basic         = Config.BasicReversedCard
 type instance ConfigFor 'Excerpt       = Config.ExcerptSpec
 type instance ConfigFor 'Pronunciation = Config.PronunciationSpec
 
-type instance ResultFor 'Minimal       = RMinimalNoteVF
-type instance ResultFor 'Basic         = RBasicReversedNoteVF
+type instance ResultFor 'Minimal       = RMinimalNote
+type instance ResultFor 'Basic         = RBasicNote
 type instance ResultFor 'Excerpt       = RExcerptNote
-type instance ResultFor 'Pronunciation = RForvoNote
+type instance ResultFor 'Pronunciation = RPronunciationNote
 
 type PartTypes = Eval (FMap ConfigFor' CardTypes)
 type NoteTypes = Eval (FMap ResultFor' CardTypes)
@@ -263,13 +264,13 @@ main = do
       & stripRecInput
       & stripRecInput
       & endRecInput
-      & runInputCase' @RMinimalNoteVF
+      & runInputCase' @RMinimalNote
         (uncurry renderDeck . runEnv . getCompose)
-      & runInputCase' @RBasicReversedNoteVF
+      & runInputCase' @RBasicNote
         (uncurry renderDeck . runEnv . getCompose)
       & runInputCase' @RExcerptNote
         (uncurry renderDeck . runEnv . getCompose)
-      & runInputCase' @RForvoNote
+      & runInputCase' @RPronunciationNote
         (uncurry renderDeck . runEnv . getCompose)
       & subsume
       & runInputConstFC @Config.MinimalReversedCard
@@ -287,7 +288,7 @@ main = do
 
       & reduceStaging @'Basic
       & fmapMethodology' @DiffractF
-      & runMethodologyPure generateBasicReversedNoteVF
+      & runMethodologyPure generateBasicReversed
 
       & reduceStaging @'Excerpt
       & fmapCMethodology

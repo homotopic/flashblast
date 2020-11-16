@@ -29,6 +29,7 @@ library
       FlashBlast.Conventions
       FlashBlast.Domain
       FlashBlast.ForvoClient
+      FlashBlast.VF
       FlashBlast.YouTubeDL
   other-modules:
       Paths_flashblast

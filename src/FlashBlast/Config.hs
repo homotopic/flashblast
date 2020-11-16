@@ -5,8 +5,8 @@ module FlashBlast.Config where
 
 import qualified Dhall                  as D
 import qualified Dhall.Deriving         as D
-import           FlashBlast.Conventions
 import           FlashBlast.ForvoClient
+import           FlashBlast.VF
 import           Path
 import           Path.Dhall             ()
 import           Optics.TH
@@ -14,7 +14,7 @@ import           RIO
 
 data MultiClozeSpec = MultiClozeSpec {
   _phrases :: [Text]
-, _images  :: [Path Rel File]
+, _images  :: VFC
 } deriving stock (Eq, Generic, Show)
   deriving (D.FromDhall, D.ToDhall)
     via D.Codec (D.Field (D.DropPrefix "_")) MultiClozeSpec
@@ -101,9 +101,9 @@ makeFieldsNoPrefix ''PronunciationSpec
 
 data BasicReversedCard = BasicReversedCard {
   _front       :: VF
-, _front_extra :: VF
+, _front_extra :: VFC
 , _back        :: VF
-, _back_extra  :: VF
+, _back_extra  :: VFC
 } deriving stock (Eq, Generic, Show)
   deriving (D.FromDhall, D.ToDhall)
     via D.Codec (D.Field (D.DropPrefix "_")) BasicReversedCard

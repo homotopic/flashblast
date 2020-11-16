@@ -13,30 +13,28 @@ let ExcerptSpec =
       , framef : Text → Text
       }
 
-let VariField = < Empty | Raw : Text | Images : List Text | Audio : Text >
+let VF = < Blank | RawText : Text | Image : Text | Audio : Text | Video : Text >
 
-let MinimalReversedSpec = { front : VariField, back : VariField }
+let VFC = < Single VF | Multi (List VF) >
+
+let MinimalReversedSpec = { front : VF, back : VF }
 
 let BasicReversedSpec =
-      { front : VariField
-      , front_extra : VariField
-      , back : VariField
-      , back_extra : VariField
-      }
+      { front : VF, front_extra : VFC, back : VF, back_extra : VFC }
 
 let Forvo = { locale : Text, preferredspeakers : List Text }
 
 let PronunciationSpec =
-         { multis : List MultiClozeSpec
-         , audiof : Text → Text
-         , forvo : Optional Forvo
-         }
+      { multis : List MultiClozeSpec
+      , audiof : Text → Text
+      , forvo : Optional Forvo
+      }
 
 let Spec =
-      < Pronunciation   : List PronunciationSpec
-      | Excerpt         : List ExcerptSpec
+      < Pronunciation : List PronunciationSpec
+      | Excerpt : List ExcerptSpec
       | MinimalReversed : List MinimalReversedSpec
-      | BasicReversed   : List BasicReversedSpec
+      | BasicReversed : List BasicReversedSpec
       >
 
 let Part = { outfile : Text, spec : Spec }
@@ -66,8 +64,7 @@ let defaultYouTubeDLSpec =
       λ(u : Text) →
       λ(s : Text) →
         { source =
-            VideoSource.YouTubeDL
-              { url = u, out = "${t}.mp4", format = "mp4" }
+            VideoSource.YouTubeDL { url = u, out = "${t}.mp4", format = "mp4" }
         , subs = s
         , clipf = λ(n : Text) → "${t}-${n}.mkv"
         , audiof = λ(n : Text) → "${t}-${n}.mp3"
@@ -77,7 +74,7 @@ let defaultYouTubeDLSpec =
 in  { MultiClozeSpec
     , VideoSource
     , ExcerptSpec
-    , VariField
+    , VF
     , MinimalReversedSpec
     , BasicReversedSpec
     , Forvo
