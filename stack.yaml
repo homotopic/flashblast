@@ -10,6 +10,7 @@ extra-deps:
 - path-utils-0.1.1.0
 - unliftio-path-0.0.2.0
 - polysemy-video-0.1.2.0
+- polysemy-http-0.3.0.0
 - polysemy-zoo-0.7.0.1
 - co-log-polysemy-formatting-0.1.0.0
 - polysemy-methodology-0.1.7.0

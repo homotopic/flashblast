@@ -310,10 +310,7 @@ main = do
       & interpretYouTubeDL
       & runError @SubtitleParseException
       & runError @ForvoLimitReachedException
-      & runRemoteHttpRequest
       & runError @ForvoResponseNotUnderstood
       & runError @ForvoAPIKeyIncorrectException
-      & runError @JSONException
-      & runError @BadRequestException
       & interpretFFMpegCli
       & runM

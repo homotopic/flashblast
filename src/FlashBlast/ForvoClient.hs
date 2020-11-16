@@ -7,8 +7,9 @@ import Polysemy
 import Polysemy.Error
 import Polysemy.Input
 import RIO hiding (fromException, try)
-import qualified RIO.Text as T
-import Network.HTTP.Simple
+import qualified RIO.ByteString.Lazy as LBS
+import qualified RIO.ByteString as BS
+import Polysemy.Http as Http
 
 newtype Locale = Locale Text
   deriving (Eq, Show, Generic, Ord)
@@ -92,10 +93,6 @@ makeSem ''ForvoClient
 newtype ForvoAPIKey = ForvoAPIKey Text
   deriving (Eq, Show, Generic)
 
-data RemoteHttpRequest m a where
-  RequestJSON :: FromJSON a => Text -> RemoteHttpRequest m a
-  RequestBS   :: Text -> RemoteHttpRequest m ByteString
-
 data ForvoLimitReachedException = ForvoLimitReachedException
   deriving (Eq, Show, Generic)
 
@@ -139,33 +136,6 @@ data ForvoResponseNotUnderstood = ForvoResponseNotUnderstood ByteString
 instance Exception ForvoResponseNotUnderstood where
   displayException (ForvoResponseNotUnderstood x) = show x
 
-makeSem ''RemoteHttpRequest
-
-data BadRequestException where
-  BadRequestException :: Exception e => e -> BadRequestException
-
-deriving instance Show BadRequestException
-
-instance Exception BadRequestException where
-  displayException = show
-
-runRemoteHttpRequest :: Members '[Embed IO, Error JSONException, Error BadRequestException] r => Sem (RemoteHttpRequest ': r) a -> Sem r a
-runRemoteHttpRequest = interpret \case
-  RequestJSON x -> do
-    let k = parseRequestThrow $ T.unpack x
-    case k of
-      Left e -> throw @BadRequestException $ BadRequestException e
-      Right x' -> do
-        j <- fromException @JSONException $ httpJSON x'
-        return $ getResponseBody j
-  RequestBS x -> do
-    let k = parseRequest $ T.unpack x
-    case k of
-      Left e -> throw @BadRequestException $ BadRequestException e
-      Right x' -> do
-        j <- httpBS x'
-        return $ getResponseBody j
-
 throwIfLimitReached :: Member (Error ForvoLimitReachedException) r => ByteString -> Sem r ByteString
 throwIfLimitReached z = let (z' :: Either String ForvoLimitResponse) = eitherDecodeStrict z
                         in case z' of
@@ -178,34 +148,45 @@ throwIfIncorrectDomain z = let (z' :: Either String ForvoIncorrectDomainResponse
                           Left _  -> return z
                           Right _ -> throw ForvoAPIKeyIncorrectException
 
+validate :: forall r. Members [Error ForvoLimitReachedException
+                             , Error ForvoAPIKeyIncorrectException
+                             , Error HttpError] r
+          => Either HttpError (Response LBS.ByteString) -> Sem r ByteString
+validate z = do
+        z' <- either throw (return . LBS.toStrict . body) z
+        _ <- throwIfLimitReached z'
+        _ <- throwIfIncorrectDomain z'
+        return z'
 
-runForvoClient :: Members '[ RemoteHttpRequest
-                           , Input ForvoAPIKey
+analyse :: forall a r. (FromJSON a,
+           Members '[Error ForvoResponseNotUnderstood] r)
+        => BS.ByteString -> Sem r a
+analyse z = do
+        either
+          (const $ throw @ForvoResponseNotUnderstood . ForvoResponseNotUnderstood $ z)
+          return
+          (eitherDecodeStrict z :: Either String a)
+
+runForvoClient :: Members '[ Input ForvoAPIKey
                            , Error ForvoLimitReachedException
                            , Error ForvoAPIKeyIncorrectException
-                           , Error ForvoResponseNotUnderstood] r => Sem (ForvoClient ': r) a -> Sem r a
+                           , Error HttpError
+                           , Error ForvoResponseNotUnderstood
+                           , Http ByteString] r => Sem (ForvoClient ': r) a -> Sem r a
 runForvoClient = interpret \case
   StandardPronunciation (Locale l) t -> do
     ForvoAPIKey f <- input @ForvoAPIKey
-    let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/standard-pronunciation/word/" <> t <> "/language/" <> l
-    z <- requestBS k
-    _ <- throwIfLimitReached z
-    _ <- throwIfIncorrectDomain z
-    let (y' :: Either String ForvoStandardPronunciationResponseBody) = eitherDecodeStrict z
-    case y' of
-      Left _ -> throw @ForvoResponseNotUnderstood (ForvoResponseNotUnderstood z)
-      Right x -> return x
+    z <- Http.request (Http.get "apifree.forvo.com" $ Path $ "key/" <> f <> "/format/json/action/standard-pronunciation/word/" <> t <> "/language/" <> l)
+    validate z >>= analyse
   LanguageList -> do
     ForvoAPIKey f <- input @ForvoAPIKey
-    let k = "https://apifree.forvo.com/key/" <> f <> "/format/json/action/language-list/order/name"
-    z <- requestBS k
-    _ <- throwIfLimitReached z
-    _ <- throwIfIncorrectDomain z
-    let (y' :: Either String ForvoLanguageListResponseBody) = eitherDecodeStrict z
-    case y' of
-      Left _ -> throw @ForvoResponseNotUnderstood (ForvoResponseNotUnderstood z)
-      Right x -> return x
+    z <- Http.request (Http.get "apifree.forvo.com" $ Path $ "key/" <> f <> "/format/json/action/language-list/order/name")
+    validate z >>= analyse
   MP3For x -> let (MP3Url x') = view mp3Url x
-              in requestBS x' >>= throwIfLimitReached
+              in do
+                let Right k = getUrl x'
+                request k >>= validate
   OggFor x -> let (OggUrl x') = view oggUrl x
-              in requestBS x' >>= throwIfLimitReached
+              in do
+                let Right k = getUrl x'
+                request k >>= validate

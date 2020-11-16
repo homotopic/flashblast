@@ -61,6 +61,13 @@ packages:
   original:
     hackage: polysemy-video-0.1.2.0
 - completed:
+    hackage: polysemy-http-0.3.0.0@sha256:65d6407181bd5ca8ac85b891c32c707387584bfe7d609f10f1f0327b8ce00aa4,7362
+    pantry-tree:
+      size: 2384
+      sha256: d2d6e63149308ddb4f1cbf13f688837273beda4009aede2d0d7d32c7347f8d21
+  original:
+    hackage: polysemy-http-0.3.0.0
+- completed:
     hackage: polysemy-zoo-0.7.0.1@sha256:60c2921df95f61d43222a75adde4f330e9510320b416132838a354cd81b4bcc5,3846
     pantry-tree:
       size: 2979

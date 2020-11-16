@@ -11,15 +11,24 @@ import           Lucid
 import           Path
 import           Path.Dhall       ()
 import           Path.Utils
-import           RIO 
+import           RIO
 import           RIO.List.Partial
 import qualified RIO.Text         as T
 import qualified RIO.Text.Lazy    as LT
 import qualified RIO.Text.Partial as T
 import Optics hiding ((%), Empty, view)
 
-data VF = Empty | Raw Text | Images [Path Rel File] | Audio (Path Rel File)
-  deriving (Eq, Show ,Generic)
+data VF where
+  Blank      :: VF
+  RawText    :: Text -> VF
+  Image      :: Path Rel File -> VF
+  Audio      :: Path Rel File -> VF
+  Video      :: Path Rel File -> VF
+  Multi      :: [VF] -> VF
+
+deriving instance Generic VF
+deriving instance Eq      VF
+deriving instance Show    VF
 
 makePrisms ''VF
 
@@ -31,7 +40,7 @@ withLensesAndProxies [d|
   type FExtra a      = "extra" :-> a
   type FBack a       = "back"  :-> a
   type FFrontExtra a = "front-extra" :-> a
-  type FBackExtra a    = "back-extra" :-> a
+  type FBackExtra a  = "back-extra" :-> a
   type FAudio1       = "audio1" :-> Maybe (Path Rel File)
   type FAudio2       = "audio2" :-> Maybe (Path Rel File)
   type FAudio3       = "audio3" :-> Maybe (Path Rel File)
@@ -90,10 +99,10 @@ renderBasicReversedNoteVF :: RBasicReversedNoteVF -> Text
 renderBasicReversedNoteVF (a :*: b :*: c :*: d :*: RNil) = T.intercalate "\t" $ renderVF <$> [a,b,c,d]
 
 renderVF :: VF -> Text
-renderVF Empty = ""
-renderVF (Raw x) = x
-renderVF (Images x) = T.intercalate "\n" $ LT.toStrict . renderText . ungroundedImage <$> x
-renderVF (Audio x) = soundEmbed x
+renderVF Blank       = ""
+renderVF (RawText x) = x
+renderVF (Image x)   = LT.toStrict . renderText . ungroundedImage $ x
+renderVF (Audio x)   = soundEmbed x
 
 genForvos :: Text -> [Path Rel File] -> [Path Rel File] -> RForvoNote
 genForvos x zs ys' =
@@ -125,7 +134,7 @@ class HasMedia f where
   getMedia :: f -> [Path Rel File]
 
 vfMedia :: VF -> [Path Rel File]
-vfMedia (Images x) = x
+vfMedia (Image x) = [x]
 vfMedia (Audio x) = [x]
 vfMedia _ = []
 
