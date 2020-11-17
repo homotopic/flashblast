@@ -172,7 +172,7 @@ runForvoClient :: Members '[ Input ForvoAPIKey
                            , Error ForvoAPIKeyIncorrectException
                            , Error HttpError
                            , Error ForvoResponseNotUnderstood
-                           , Http ByteString] r => Sem (ForvoClient ': r) a -> Sem r a
+                           , Http (IO ByteString)] r => Sem (ForvoClient ': r) a -> Sem r a
 runForvoClient = interpret \case
   StandardPronunciation (Locale l) t -> do
     ForvoAPIKey f <- input @ForvoAPIKey

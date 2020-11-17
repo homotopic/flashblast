@@ -1,48 +1,39 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 import           Colog.Polysemy
-import           Colog.Polysemy.Formatting
-import           Colog.Polysemy.Formatting.Color
-import           Colog.Polysemy.Formatting.LogEnv
-import           Colog.Polysemy.Formatting.Render
-import           Colog.Polysemy.Formatting.ThreadTimeMessage
 import           Composite.Record
 import qualified Data.Attoparsec.Text                        as A
-import Fcf hiding (Map, Error)
-import Fcf.Class.Functor hiding (Map)
+import           Fcf hiding (Map, Error)
+import           Fcf.Class.Functor hiding (Map)
 import           Data.Monoid.Generic
-import           Data.Text.Lazy.Builder                      (Builder)
 import qualified Dhall                                       as D
-import           Network.HTTP.Simple
 import           Path
 import           Path.Dhall                                  ()
 import           Path.Utils
 import           Polysemy
 import           Polysemy.Error                              as P
 import           Polysemy.Input
+import Polysemy.Resource
 import           Polysemy.KVStore
 import           Polysemy.Output
 import           Polysemy.Video                              hiding (to)
-import           RIO.Time
 import Polysemy.FSKVStore
 
 import           FlashBlast.ClozeParse
 import Control.Comonad.Env
 import qualified FlashBlast.Config                           as Config
 import Polysemy.Methodology.Composite
-import Data.Kind
 import           FlashBlast.Conventions
 import           FlashBlast.Domain
 import           FlashBlast.ForvoClient                      hiding (id)
-import Data.Functor.Contravariant
 import           FlashBlast.YouTubeDL
 import Polysemy.FS
 import Composite.CoRecord
-import qualified Formatting                                  as F
-import           Formatting.Time
 import           Optics
 import           Polysemy.Methodology
 import           Polysemy.Tagged
+import Polysemy.Http hiding (Path)
 import           RIO                                         hiding (Builder, trace, log, Display,
                                                               logInfo, over, to,
                                                               view,
@@ -54,7 +45,6 @@ import qualified RIO.Text                                    as T
 import qualified Text.Subtitles.SRT                          as SR
 import Data.Vinyl.Functor
 import Polysemy.Vinyl
-import Polysemy.Trace
 import Data.Vinyl
 import FlashBlast.VF
 
@@ -138,29 +128,38 @@ getForvo l t f = do
       x' <- downloadMP3For l t
       updateKV f x'
 
-runMultiClozeSpecIO :: Members '[ FSWrite
-                                , FSRead
-                                , FSExist
-                                , FSDir] m
+runMultiClozeSpecIO :: Members '[ Input Config.ResourceDirs
+                                , FSKVStore Rel ByteString
+                                , Http (IO ByteString)
+                                , Error HttpError
+                                , Error SomeException
+                                ] m
                     => (Text -> Path Rel File)
+                    -> Maybe ForvoAPIKey
                     -> Maybe Config.ForvoSpec
                     -> Config.MultiClozeSpec
                     -> Sem m [RPronunciationNote]
-runMultiClozeSpecIO f s (Config.MultiClozeSpec p is) = do
+runMultiClozeSpecIO f y s (Config.MultiClozeSpec p is) = do
     forM p \a -> let (bs, cs) = genClozePhrase a
-                 in return $ genForvos bs is (map (Audio . f) cs)
+                 in do
+                   Config.ResourceDirs {..} <- input
+                   case (liftA2 (,) s y) of
+                          Nothing -> return ()
+                          Just (Config.ForvoSpec l, k) -> do
+                            (forM_ cs $ \x -> getForvo l x (_audio </> f x))
+                              & runForvoClient
+                              & mapError @ForvoResponseNotUnderstood SomeException
+                              & mapError @ForvoLimitReachedException SomeException
+                              & mapError @ForvoAPIKeyIncorrectException SomeException
+                              & runInputConst @ForvoAPIKey k
+                   return $ genForvos bs (Multi $ map Image is) (map (Audio . f) cs)
 
-runPronunciationSpecIO :: Members '[Input Config.ResourceDirs
-                                   , FSWrite
-                                   , FSExist
-                                   , FSRead
-                                   , FSDir
-                                   ] m
-                        => Config.PronunciationSpec
+runPronunciationSpecIO :: Members '[FSKVStore Rel ByteString, Error HttpError, Input Config.ResourceDirs, Http (IO ByteString), Error SomeException] m
+                       => Maybe ForvoAPIKey
+                        -> Config.PronunciationSpec
                         -> Sem m [RPronunciationNote]
-runPronunciationSpecIO (Config.PronunciationSpec f ms a) = do
-                                                     zs <- forM ms $ runMultiClozeSpecIO f a
-                                                     return $ join zs
+runPronunciationSpecIO k (Config.PronunciationSpec f ms a) =
+  fmap join $ forM ms $ runMultiClozeSpecIO f k a
 
 data Deck = Deck {
   notes :: Map (Path Rel File) Text
@@ -222,7 +221,6 @@ type NoteTypes = Eval (FMap ResultFor' CardTypes)
 type AnalysisF = FileMap Rel :. []
 type StagingF  = [] :. Env (Path Rel File) :. []
 type DiffractF = Env (Path Rel File) :. []
-
 
 reduceStaging :: forall (c :: CardType) r a. (ResultFor c) ∈ NoteTypes
               => Sem (Methodology (StagingF (ConfigFor c)) ([CoRec DiffractF NoteTypes]) ': r) a
@@ -298,7 +296,7 @@ main = do
       & reduceStaging @'Pronunciation
       & fmapCMethodology
       & bindMethodology'
-      & runMethodologySem runPronunciationSpecIO
+      & runMethodologySem (runPronunciationSpecIO _forvoApiKey)
 
       & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
       & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
@@ -309,9 +307,12 @@ main = do
       & runFSRead
       & runFSWrite
       & interpretYouTubeDL
-      & runError @SubtitleParseException
-      & runError @ForvoLimitReachedException
-      & runError @ForvoResponseNotUnderstood
-      & runError @ForvoAPIKeyIncorrectException
       & interpretFFMpegCli
+      & interpretHttpNative
+      & runFSKVStoreRelBS $(mkRelDir ".")
+      & runError @SubtitleParseException
+      & runError @SomeException
+      & runError @HttpError
+      & interpretLogNull
+      & resourceToIO
       & runM

@@ -1,3 +1,7 @@
+let VF = < Blank | RawText : Text | Image : Text | Audio : Text | Video : Text >
+
+let VFC = < Single : VF | Multi : List VF >
+
 let MultiClozeSpec = { phrases : List Text, images : List Text }
 
 let VideoSource =
@@ -13,16 +17,14 @@ let ExcerptSpec =
       , framef : Text → Text
       }
 
-let VF = < Blank | RawText : Text | Image : Text | Audio : Text | Video : Text >
 
-let VFC = < Single VF | Multi (List VF) >
 
 let MinimalReversedSpec = { front : VF, back : VF }
 
 let BasicReversedSpec =
       { front : VF, front_extra : VFC, back : VF, back_extra : VFC }
 
-let Forvo = { locale : Text, preferredspeakers : List Text }
+let Forvo = { locale : Text }
 
 let PronunciationSpec =
       { multis : List MultiClozeSpec

@@ -14,7 +14,7 @@ import           RIO
 
 data MultiClozeSpec = MultiClozeSpec {
   _phrases :: [Text]
-, _images  :: VFC
+, _images  :: [Path Rel File]
 } deriving stock (Eq, Generic, Show)
   deriving (D.FromDhall, D.ToDhall)
     via D.Codec (D.Field (D.DropPrefix "_")) MultiClozeSpec
@@ -82,7 +82,6 @@ instance D.ToDhall Speaker
 
 data ForvoSpec = ForvoSpec {
   _locale            :: Locale
-, _preferredspeakers :: [Speaker]
 } deriving stock (Eq, Generic, Show)
   deriving (D.FromDhall, D.ToDhall)
     via D.Codec (D.Field (D.DropPrefix "_")) ForvoSpec
