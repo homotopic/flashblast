@@ -48,12 +48,6 @@ import Data.Vinyl
 import FlashBlast.VF
 import FlashBlast.Subtitles
 
-fromTime :: SR.Time -> Time
-fromTime (SR.Time h m s f) = Time h m s f
-
-fromRange :: SR.Range -> Range
-fromRange (SR.Range f t) = Range (fromTime f) (fromTime t)
-
 interpretVideoSource :: Members '[Input Config.ResourceDirs, YouTubeDL] m
                      => Config.VideoSource
                      -> Sem m (Path Rel File)

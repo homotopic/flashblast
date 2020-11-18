@@ -1,12 +1,12 @@
 module FlashBlast.Subtitles where
 
 import Dhall
-import Dhall.Deriving
 import Text.Subtitles.SRT
 import qualified Data.Attoparsec.Text as A
 import RIO
 import Data.Either.Validation
 import qualified RIO.Text as T
+import qualified Polysemy.Video as V
 
 data SRT = SRT [Line]
   deriving (Eq, Show, Ord)
@@ -32,3 +32,9 @@ srtDecoder opts =
               Failure e        -> Failure e
 
         expectedSrt = expected textDecoder
+
+fromTime :: Time -> V.Time
+fromTime (Time h m s f) = V.Time h m s f
+
+fromRange :: Range -> V.Range
+fromRange (Range f t) = V.Range (fromTime f) (fromTime t)
