@@ -29,6 +29,7 @@ library
       FlashBlast.Conventions
       FlashBlast.Domain
       FlashBlast.ForvoClient
+      FlashBlast.Messages
       FlashBlast.Subtitles
       FlashBlast.VF
       FlashBlast.YouTubeDL

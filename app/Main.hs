@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import           Colog.Polysemy
+import           Colog.Polysemy.Formatting
 import           Composite.CoRecord
 import           Composite.Record
 import           Control.Comonad.Env
@@ -15,9 +16,11 @@ import qualified FlashBlast.Config                           as Config
 import           FlashBlast.Conventions
 import           FlashBlast.Domain
 import           FlashBlast.ForvoClient                      hiding (id)
+import           FlashBlast.Messages
 import           FlashBlast.Subtitles
 import           FlashBlast.VF
 import           FlashBlast.YouTubeDL
+import qualified Formatting as F
 import           Data.Monoid.Generic
 import qualified Dhall                                       as D
 import           Optics
@@ -127,13 +130,15 @@ runMultiClozeSpecIO f y s (Config.MultiClozeSpec p is) = do
     forM p \a -> do
                    let (bs, cs) = genClozePhrase a
                    Config.ResourceDirs {..} <- input
-                   whenJust (liftA2 (,) s y) \(Config.ForvoSpec l, k) ->
-                     forM_ cs $ \x -> getForvo l x (_audio </> f x)
-                       & runForvoClient
-                       & mapError @ForvoResponseNotUnderstood SomeException
-                       & mapError @ForvoLimitReachedException SomeException
-                       & mapError @ForvoAPIKeyIncorrectException SomeException
-                       & runInputConst @ForvoAPIKey k
+                   P.catch (
+                     whenJust (liftA2 (,) s y) \(Config.ForvoSpec l, k) ->
+                       forM_ cs $ \x -> getForvo l x (_audio </> f x)
+                         & runForvoClient
+                         & mapError @ForvoResponseNotUnderstood SomeException
+                         & mapError @ForvoLimitReachedException SomeException
+                         & mapError @ForvoAPIKeyIncorrectException SomeException
+                         & runInputConst @ForvoAPIKey k
+                      ) (\(_ :: SomeException) -> return ())
                    return $ genForvos bs (Multi $ map Image is) (map (Audio . f) cs)
 
 runPronunciationSpecIO :: Members '[ FSKVStore Rel ByteString
@@ -227,6 +232,9 @@ main = do
       & untag @CollectionsPackage
       & runOutputSem writeOutDeck
       & untag @ConstructionMethodology
+      & logMethodologyAround @Config.Deck @Deck
+        (const $ F.sformat msgBuildingDeck n)
+        (const $ F.sformat msgDeckComplete n)
       & diffractMethodology'  @Config.Deck @DiffractF @NoteTypes @Deck
       & cutMethodology'       @Config.Deck @(Rec AnalysisF PartTypes)
       & runRecInitialAsInputCompose'
@@ -298,6 +306,7 @@ main = do
       & runFSKVStoreRelBS $(mkRelDir ".")
       & runError @SomeException
       & runError @HttpError
+      & runLogAction (logTextStderr)
       & interpretLogNull
       & resourceToIO
       & runM
