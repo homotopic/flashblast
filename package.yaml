@@ -66,6 +66,7 @@ dependencies:
 - comonad
 - composite-base
 - dhall
+- either
 - first-class-families
 - formatting
 - generic-monoid

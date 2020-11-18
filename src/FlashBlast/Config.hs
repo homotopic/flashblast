@@ -6,6 +6,7 @@ module FlashBlast.Config where
 import qualified Dhall                  as D
 import qualified Dhall.Deriving         as D
 import           FlashBlast.ForvoClient
+import FlashBlast.Subtitles
 import           FlashBlast.VF
 import           Path
 import           Path.Dhall             ()
@@ -50,7 +51,7 @@ makePrisms ''VideoSource
 
 data ExcerptSpec = ExcerptSpec {
   _source :: VideoSource
-, _subs   :: Text
+, _subs   :: SRT
 , _clipf  :: Text -> Path Rel File
 , _audiof :: Text -> Path Rel File
 , _framef :: Text -> Path Rel File

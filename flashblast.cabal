@@ -29,6 +29,7 @@ library
       FlashBlast.Conventions
       FlashBlast.Domain
       FlashBlast.ForvoClient
+      FlashBlast.Subtitles
       FlashBlast.VF
       FlashBlast.YouTubeDL
   other-modules:
@@ -46,6 +47,7 @@ library
     , comonad
     , composite-base
     , dhall
+    , either
     , first-class-families
     , formatting
     , generic-monoid
@@ -99,6 +101,7 @@ executable flashblast
     , comonad
     , composite-base
     , dhall
+    , either
     , first-class-families
     , flashblast
     , formatting

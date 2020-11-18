@@ -3,7 +3,6 @@
 
 import           Colog.Polysemy
 import           Composite.Record
-import qualified Data.Attoparsec.Text                        as A
 import           Fcf hiding (Map, Error)
 import           Fcf.Class.Functor hiding (Map)
 import           Data.Monoid.Generic
@@ -47,6 +46,7 @@ import Data.Vinyl.Functor
 import Polysemy.Vinyl
 import Data.Vinyl
 import FlashBlast.VF
+import FlashBlast.Subtitles
 
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
@@ -66,8 +66,7 @@ interpretVideoSource = \case
     Config.ResourceDirs{..} <- input @Config.ResourceDirs
     return (_video </> x)
 
-runExcerptSpecIO :: Members '[ Error SubtitleParseException
-                             , FSExist
+runExcerptSpecIO :: Members '[ FSExist
                              , FSTemp
                              , FSCopy
                              , FSDir
@@ -80,7 +79,7 @@ runExcerptSpecIO :: Members '[ Error SubtitleParseException
 runExcerptSpecIO Config.ExcerptSpec {..} = do
   Config.ExportDirs{..} <- input @Config.ExportDirs
   t <- interpretVideoSource _source
-  s' <- either (throw . SubtitleParseException) return $ A.parseOnly SR.parseSRT _subs
+  let (SRT s') = _subs
   let cs = map (_clipf  . T.pack . show . SR.index) s'
   let es = map (_audiof . T.pack . show . SR.index) s'
   let fs = map (_framef . T.pack . show . SR.index) s'
@@ -104,11 +103,6 @@ runExcerptSpecIO Config.ExcerptSpec {..} = do
           :& val @"extra" (Multi [Image f])
           :& val @"back"  (Audio e)
           :& RNil
-
-newtype SubtitleParseException = SubtitleParseException String
-  deriving (Eq, Show, Generic)
-
-instance Exception SubtitleParseException
 
 downloadMP3For :: Members '[ForvoClient] r => Locale -> Text -> Sem r (Maybe ByteString)
 downloadMP3For l@(Locale l') t = do
@@ -310,7 +304,6 @@ main = do
       & interpretFFMpegCli
       & interpretHttpNative
       & runFSKVStoreRelBS $(mkRelDir ".")
-      & runError @SubtitleParseException
       & runError @SomeException
       & runError @HttpError
       & interpretLogNull
