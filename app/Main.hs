@@ -102,9 +102,7 @@ runExcerptSpecIO Config.ExcerptSpec {..} = do
 downloadMP3For :: Members '[ForvoClient] r => Locale -> Text -> Sem r (Maybe ByteString)
 downloadMP3For l t = do
   ForvoStandardPronunciationResponseBody {..} <- standardPronunciation l t
-  case items of
-      []     -> return Nothing
-      (x':_) -> Just <$> mP3For x'
+  traverse mP3For . headMaybe $ items
 
 getForvo :: Members '[ FSKVStore Rel ByteString
                      , ForvoClient] r
@@ -113,9 +111,7 @@ getForvo l t f = do
   z <- lookupKV f
   case z of
     Just _ -> return ()
-    Nothing -> do
-      x' <- downloadMP3For l t
-      updateKV f x'
+    Nothing -> downloadMP3For l t >>= updateKV f
 
 runMultiClozeSpecIO :: Members '[ Input Config.ResourceDirs
                                 , FSKVStore Rel ByteString
