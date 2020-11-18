@@ -2,37 +2,42 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import           Colog.Polysemy
+import           Composite.CoRecord
 import           Composite.Record
+import           Control.Comonad.Env
+import           Control.Monad.Extra hiding (whenM)
+import           Data.Vinyl
+import           Data.Vinyl.Functor
 import           Fcf hiding (Map, Error)
 import           Fcf.Class.Functor hiding (Map)
+import           FlashBlast.ClozeParse
+import qualified FlashBlast.Config                           as Config
+import           FlashBlast.Conventions
+import           FlashBlast.Domain
+import           FlashBlast.ForvoClient                      hiding (id)
+import           FlashBlast.Subtitles
+import           FlashBlast.VF
+import           FlashBlast.YouTubeDL
 import           Data.Monoid.Generic
 import qualified Dhall                                       as D
+import           Optics
 import           Path
 import           Path.Dhall                                  ()
 import           Path.Utils
 import           Polysemy
 import           Polysemy.Error                              as P
+import           Polysemy.FS
+import           Polysemy.FSKVStore
+import           Polysemy.Http hiding (Path)
 import           Polysemy.Input
-import Polysemy.Resource
 import           Polysemy.KVStore
-import           Polysemy.Output
-import           Polysemy.Video                              hiding (to)
-import Polysemy.FSKVStore
-
-import           FlashBlast.ClozeParse
-import Control.Comonad.Env
-import qualified FlashBlast.Config                           as Config
-import Polysemy.Methodology.Composite
-import           FlashBlast.Conventions
-import           FlashBlast.Domain
-import           FlashBlast.ForvoClient                      hiding (id)
-import           FlashBlast.YouTubeDL
-import Polysemy.FS
-import Composite.CoRecord
-import           Optics
 import           Polysemy.Methodology
+import           Polysemy.Methodology.Composite
+import           Polysemy.Output
+import           Polysemy.Resource
 import           Polysemy.Tagged
-import Polysemy.Http hiding (Path)
+import           Polysemy.Video                              hiding (to)
+import           Polysemy.Vinyl
 import           RIO                                         hiding (Builder, trace, log, Display,
                                                               logInfo, over, to,
                                                               view,
@@ -42,12 +47,6 @@ import           RIO.List
 import qualified RIO.Map                                     as Map
 import qualified RIO.Text                                    as T
 import qualified Text.Subtitles.SRT                          as SR
-import Data.Vinyl.Functor
-import Polysemy.Vinyl
-import Data.Vinyl
-import FlashBlast.VF
-import FlashBlast.Subtitles
-import Control.Monad.Extra hiding (whenM)
 
 interpretVideoSource :: Members '[Input Config.ResourceDirs, YouTubeDL] m
                      => Config.VideoSource
@@ -137,10 +136,14 @@ runMultiClozeSpecIO f y s (Config.MultiClozeSpec p is) = do
                        & runInputConst @ForvoAPIKey k
                    return $ genForvos bs (Multi $ map Image is) (map (Audio . f) cs)
 
-runPronunciationSpecIO :: Members '[FSKVStore Rel ByteString, Error HttpError, Input Config.ResourceDirs, Http (IO ByteString), Error SomeException] m
+runPronunciationSpecIO :: Members '[ FSKVStore Rel ByteString
+                                   , Error HttpError
+                                   , Input Config.ResourceDirs
+                                   , Http (IO ByteString)
+                                   , Error SomeException] m
                        => Maybe ForvoAPIKey
-                        -> Config.PronunciationSpec
-                        -> Sem m [RPronunciationNote]
+                       -> Config.PronunciationSpec
+                       -> Sem m [RPronunciationNote]
 runPronunciationSpecIO k (Config.PronunciationSpec f ms a) =
   fmap join $ forM ms $ runMultiClozeSpecIO f k a
 
