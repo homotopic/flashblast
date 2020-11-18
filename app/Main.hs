@@ -100,7 +100,7 @@ runExcerptSpecIO Config.ExcerptSpec {..} = do
           :& RNil
 
 downloadMP3For :: Members '[ForvoClient] r => Locale -> Text -> Sem r (Maybe ByteString)
-downloadMP3For l@(Locale l') t = do
+downloadMP3For l t = do
   ForvoStandardPronunciationResponseBody {..} <- standardPronunciation l t
   case items of
       []     -> return Nothing
