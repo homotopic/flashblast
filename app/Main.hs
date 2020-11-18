@@ -47,6 +47,7 @@ import Polysemy.Vinyl
 import Data.Vinyl
 import FlashBlast.VF
 import FlashBlast.Subtitles
+import Control.Monad.Extra hiding (whenM)
 
 interpretVideoSource :: Members '[Input Config.ResourceDirs, YouTubeDL] m
                      => Config.VideoSource
@@ -128,18 +129,16 @@ runMultiClozeSpecIO :: Members '[ Input Config.ResourceDirs
                     -> Config.MultiClozeSpec
                     -> Sem m [RPronunciationNote]
 runMultiClozeSpecIO f y s (Config.MultiClozeSpec p is) = do
-    forM p \a -> let (bs, cs) = genClozePhrase a
-                 in do
+    forM p \a -> do
+                   let (bs, cs) = genClozePhrase a
                    Config.ResourceDirs {..} <- input
-                   case (liftA2 (,) s y) of
-                          Nothing -> return ()
-                          Just (Config.ForvoSpec l, k) -> do
-                            (forM_ cs $ \x -> getForvo l x (_audio </> f x))
-                              & runForvoClient
-                              & mapError @ForvoResponseNotUnderstood SomeException
-                              & mapError @ForvoLimitReachedException SomeException
-                              & mapError @ForvoAPIKeyIncorrectException SomeException
-                              & runInputConst @ForvoAPIKey k
+                   whenJust (liftA2 (,) s y) \(Config.ForvoSpec l, k) ->
+                     (forM_ cs $ \x -> getForvo l x (_audio </> f x))
+                       & runForvoClient
+                       & mapError @ForvoResponseNotUnderstood SomeException
+                       & mapError @ForvoLimitReachedException SomeException
+                       & mapError @ForvoAPIKeyIncorrectException SomeException
+                       & runInputConst @ForvoAPIKey k
                    return $ genForvos bs (Multi $ map Image is) (map (Audio . f) cs)
 
 runPronunciationSpecIO :: Members '[FSKVStore Rel ByteString, Error HttpError, Input Config.ResourceDirs, Http (IO ByteString), Error SomeException] m

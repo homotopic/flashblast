@@ -67,6 +67,7 @@ dependencies:
 - composite-base
 - dhall
 - either
+- extra
 - first-class-families
 - formatting
 - generic-monoid
