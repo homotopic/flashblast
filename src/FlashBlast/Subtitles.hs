@@ -8,7 +8,7 @@ import Data.Either.Validation
 import qualified RIO.Text as T
 import qualified Polysemy.Video as V
 
-data SRT = SRT [Line]
+newtype SRT = SRT [Line]
   deriving (Eq, Show, Ord)
 
 instance FromDhall SRT where

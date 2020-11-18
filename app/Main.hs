@@ -133,7 +133,7 @@ runMultiClozeSpecIO f y s (Config.MultiClozeSpec p is) = do
                    let (bs, cs) = genClozePhrase a
                    Config.ResourceDirs {..} <- input
                    whenJust (liftA2 (,) s y) \(Config.ForvoSpec l, k) ->
-                     (forM_ cs $ \x -> getForvo l x (_audio </> f x))
+                     forM_ cs $ \x -> getForvo l x (_audio </> f x)
                        & runForvoClient
                        & mapError @ForvoResponseNotUnderstood SomeException
                        & mapError @ForvoLimitReachedException SomeException
@@ -188,7 +188,7 @@ writeOutDeck Deck{..} = do
   forM_ (Map.toList notes) $ \(x, k) ->  writeFileUtf8 (_notes </> x) k
 
 renderDeck :: forall p. (HasMedia p, RenderNote p) => Path Rel File -> [p] -> Deck
-renderDeck x as = Deck [(x, renderNotes as)] (join $ fmap getMedia as)
+renderDeck x as = Deck [(x, renderNotes as)] (getMedia =<< as)
 
 type CardTypes = ['Minimal, 'Basic, 'Excerpt, 'Pronunciation]
 
@@ -209,8 +209,8 @@ type AnalysisF = FileMap Rel :. []
 type StagingF  = [] :. Env (Path Rel File) :. []
 type DiffractF = Env (Path Rel File) :. []
 
-reduceStaging :: forall (c :: CardType) r a. (ResultFor c) ∈ NoteTypes
-              => Sem (Methodology (StagingF (ConfigFor c)) ([CoRec DiffractF NoteTypes]) ': r) a
+reduceStaging :: forall (c :: CardType) r a. ResultFor c ∈ NoteTypes
+              => Sem (Methodology (StagingF (ConfigFor c)) [CoRec DiffractF NoteTypes] ': r) a
               -> Sem (Methodology (DiffractF (ConfigFor c)) (DiffractF (ResultFor c)) ': r) a
 reduceStaging = cutMethodology' @(StagingF (ConfigFor c))
                                @[DiffractF (ConfigFor c)]
@@ -238,7 +238,7 @@ main = do
       & endRecInput
       & cutMethodology' @(Rec AnalysisF PartTypes)
                         @(Rec StagingF PartTypes)
-      & runMethodologyRmap (onCompose (fmap Compose . fmap (uncurry env) . Map.toList))
+      & runMethodologyRmap (onCompose (fmap (Compose . uncurry env) . Map.toList))
       & stripRecTerminal
       & stripRecTerminal
       & stripRecTerminal

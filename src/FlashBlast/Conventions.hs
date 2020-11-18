@@ -73,7 +73,7 @@ renderMinimalNote (a :*: b :*: RNil) = T.intercalate "\t" $ renderVF <$> [a, b]
 
 renderBasicReversedNote :: RBasicNote -> Text
 renderBasicReversedNote (a :*: b :*: c :*: d :*: RNil)
-  = T.intercalate "\t" $ [renderVF a,renderVF b,renderVF c,renderVF d]
+  = T.intercalate "\t" [renderVF a,renderVF b,renderVF c,renderVF d]
 
 class RenderVF a where
   renderVF :: a -> Text
@@ -91,10 +91,7 @@ instance RenderVF VFC where
 
 genForvos :: Text -> VFC -> [VF] -> RPronunciationNote
 genForvos x zs ys' =
-  let ys = lpadZipWith (\a _ -> case a of
-                          Nothing -> Blank
-                          Just a  -> a
-                       ) ys' (replicate 16 ())
+  let ys = lpadZipWith (const . fromMaybe Blank) ys' (replicate 16 ())
       ks = ys !! 0  :*: ys !! 1  :*: ys !! 2  :*: ys !! 3
        :*: ys !! 4  :*: ys !! 5  :*: ys !! 6  :*: ys !! 7
        :*: ys !! 8  :*: ys !! 9  :*: ys !! 10 :*: ys !! 11
