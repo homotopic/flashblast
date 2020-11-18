@@ -47,6 +47,7 @@ import Data.Vinyl.Functor
 import Polysemy.Vinyl
 import Data.Vinyl
 import FlashBlast.VF
+import FlashBlast.AnkiDB
 
 fromTime :: SR.Time -> Time
 fromTime (SR.Time h m s f) = Time h m s f
@@ -232,7 +233,9 @@ reduceStaging = cutMethodology' @(StagingF (ConfigFor c))
             >>> pickCoRecConstructor @(ResultFor c)
 
 main :: IO ()
-main = do
+main = void $ f $(mkRelDir "foo") [$(mkRelFile "stack.yaml"), $(mkRelFile "package.yaml")] $(mkRelFile "foo.apkg")
+
+{--
   Config.FlashBlast{..} <- D.input D.auto "./index.dhall"
   forM_ (Map.toList _decks) $ \(n, x) -> do
     flashblast @Config.Deck @Deck
@@ -300,12 +303,16 @@ main = do
 
       & runInputConst @Config.ExportDirs   (view Config.exportDirs x)
       & runInputConst @Config.ResourceDirs (view Config.resourceDirs x)
+      --}
       & runFSDir
       & runFSCopy
       & runFSTemp
       & runFSExist
       & runFSRead
       & runFSWrite
+      & runFSZip
+      & runError @SomeException
+      {--
       & interpretYouTubeDL
       & interpretFFMpegCli
       & interpretHttpNative
@@ -315,4 +322,5 @@ main = do
       & runError @HttpError
       & interpretLogNull
       & resourceToIO
+      --}
       & runM

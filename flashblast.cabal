@@ -51,6 +51,7 @@ library
     , generic-monoid
     , ghc-clippy-plugin
     , http-conduit
+    , ilist
     , lucid
     , megaparsec
     , optics
@@ -65,14 +66,17 @@ library
     , polysemy-http
     , polysemy-methodology >=0.1.6.0
     , polysemy-methodology-composite >=0.1.2.0
+    , polysemy-path
     , polysemy-plugin
     , polysemy-video >=0.1.1.0
     , polysemy-vinyl >=0.1.2.0
     , polysemy-zoo
+    , raw-strings-qq
     , relude
     , replace-megaparsec
     , rio
     , semialign
+    , sqlite-simple
     , subtitleParser
     , temporary
     , text
@@ -80,6 +84,7 @@ library
     , turtle
     , unliftio-path
     , vinyl
+    , zip
   default-language: Haskell2010
 
 executable flashblast
@@ -105,6 +110,7 @@ executable flashblast
     , generic-monoid
     , ghc-clippy-plugin
     , http-conduit
+    , ilist
     , lucid
     , megaparsec
     , optics
@@ -119,14 +125,17 @@ executable flashblast
     , polysemy-http
     , polysemy-methodology >=0.1.6.0
     , polysemy-methodology-composite >=0.1.2.0
+    , polysemy-path
     , polysemy-plugin
     , polysemy-video >=0.1.1.0
     , polysemy-vinyl >=0.1.2.0
     , polysemy-zoo
+    , raw-strings-qq
     , relude
     , replace-megaparsec
     , rio
     , semialign
+    , sqlite-simple
     , subtitleParser
     , temporary
     , text
@@ -134,4 +143,5 @@ executable flashblast
     , turtle
     , unliftio-path
     , vinyl
+    , zip
   default-language: Haskell2010

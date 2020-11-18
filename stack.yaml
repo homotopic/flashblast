@@ -25,4 +25,4 @@ extra-deps:
 - polysemy-methodology-composite-0.1.4.0
 allow-newer: true
 nix:
-  packages: [zlib, libffi, ffmpeg, pkg-config, icu]
+  packages: [zlib, libffi, ffmpeg, pkg-config, icu, bzip2]

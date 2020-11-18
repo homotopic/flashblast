@@ -71,6 +71,7 @@ dependencies:
 - generic-monoid
 - ghc-clippy-plugin
 - http-conduit
+- ilist
 - lucid
 - megaparsec
 - replace-megaparsec
@@ -82,14 +83,17 @@ dependencies:
 - polysemy-fs
 - polysemy-fskvstore
 - polysemy-http
+- polysemy-path
 - polysemy-methodology >= 0.1.6.0
 - polysemy-methodology-composite >= 0.1.2.0
 - polysemy-plugin
 - polysemy-video >= 0.1.1.0
 - polysemy-vinyl >= 0.1.2.0
 - polysemy-zoo
+- raw-strings-qq
 - relude
 - rio
+- sqlite-simple
 - semialign
 - optics
 - optics-extra
@@ -100,6 +104,7 @@ dependencies:
 - turtle
 - unliftio-path
 - vinyl
+- zip
 
 library:
   source-dirs: src
