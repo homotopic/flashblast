@@ -14,7 +14,6 @@ import           RIO
 import           RIO.List.Partial
 import qualified RIO.Text         as T
 import qualified RIO.Text.Lazy    as LT
-import qualified RIO.Text.Partial as T
 
 withLensesAndProxies [d|
   type FFront        = "front" :-> VF

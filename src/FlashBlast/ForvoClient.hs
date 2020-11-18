@@ -44,7 +44,7 @@ data ForvoPronunciationJson = ForvoPronunciationJson {
 instance FromJSON ForvoPronunciationJson
 instance ToJSON ForvoPronunciationJson
 
-data ForvoAttributeCount = ForvoAttributeCount {
+newtype ForvoAttributeCount = ForvoAttributeCount {
   total :: Int
 } deriving (Eq, Show, Generic)
 
@@ -106,7 +106,7 @@ instance FromJSON ForvoLimitText where
 instance Exception ForvoLimitReachedException where
   displayException = show
 
-data ForvoLimitResponse = ForvoLimitResponse [ForvoLimitText]
+newtype ForvoLimitResponse = ForvoLimitResponse [ForvoLimitText]
   deriving Generic
 
 instance FromJSON ForvoLimitResponse
@@ -125,12 +125,12 @@ instance FromJSON ForvoIncorrectDomainText where
     "Calling from incorrect domain." -> return ForvoIncorrectDomainText
     _ -> fail "Unknown response."
 
-data ForvoIncorrectDomainResponse = ForvoIncorrectDomainResponse [ForvoIncorrectDomainText]
+newtype ForvoIncorrectDomainResponse = ForvoIncorrectDomainResponse [ForvoIncorrectDomainText]
   deriving Generic
 
 instance FromJSON ForvoIncorrectDomainResponse
 
-data ForvoResponseNotUnderstood = ForvoResponseNotUnderstood ByteString
+newtype ForvoResponseNotUnderstood = ForvoResponseNotUnderstood ByteString
   deriving (Show, Eq, Generic)
 
 instance Exception ForvoResponseNotUnderstood where

@@ -81,7 +81,7 @@ instance D.ToDhall Locale
 instance D.FromDhall Speaker
 instance D.ToDhall Speaker
 
-data ForvoSpec = ForvoSpec {
+newtype ForvoSpec = ForvoSpec {
   _locale            :: Locale
 } deriving stock (Eq, Generic, Show)
   deriving (D.FromDhall, D.ToDhall)
