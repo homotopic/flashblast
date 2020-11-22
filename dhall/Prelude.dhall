@@ -75,7 +75,7 @@ let defaultLocalMkv =
       λ(t : Text) →
       λ(s : Text) →
         { source =
-            VideoSource.LocalVideo { "${t}.mkv" }
+            VideoSource.LocalVideo "${t}.mkv"
         , subs = s
         , clipf = λ(n : Text) → "${t}-${n}.mkv"
         , audiof = λ(n : Text) → "${t}-${n}.mp3"
