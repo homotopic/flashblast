@@ -17,8 +17,6 @@ let ExcerptSpec =
       , framef : Text → Text
       }
 
-
-
 let MinimalReversedSpec = { front : VF, back : VF }
 
 let BasicReversedSpec =
@@ -73,6 +71,17 @@ let defaultYouTubeDLSpec =
         , framef = λ(n : Text) → "${t}-${n}.bmp"
         }
 
+let defaultLocalMkv =
+      λ(t : Text) →
+      λ(s : Text) →
+        { source =
+            VideoSource.LocalVideo { "${t}.mkv" }
+        , subs = s
+        , clipf = λ(n : Text) → "${t}-${n}.mkv"
+        , audiof = λ(n : Text) → "${t}-${n}.mp3"
+        , framef = λ(n : Text) → "${t}-${n}.bmp"
+        }
+
 in  { MultiClozeSpec
     , VideoSource
     , ExcerptSpec
@@ -84,4 +93,5 @@ in  { MultiClozeSpec
     , Part
     , defaultDeckLayout
     , defaultYouTubeDLSpec
+    , defaultLocalMkv
     }
