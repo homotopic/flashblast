@@ -3,12 +3,9 @@
 module FlashBlast.ForvoClient where
 
 import Data.Aeson
-import Polysemy
-import Polysemy.Error
-import Polysemy.Input
-import RIO hiding (fromException, try)
-import qualified RIO.ByteString.Lazy as LBS
-import qualified RIO.ByteString as BS
+import Techlab
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString as BS
 import Polysemy.Http as Http
 
 newtype Locale = Locale Text

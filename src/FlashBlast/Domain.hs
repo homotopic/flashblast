@@ -7,14 +7,7 @@ Top level domain specification for FlashBlast.
 -}
 module FlashBlast.Domain where
 
-import Data.Kind
-import Fcf
-import RIO
-import Polysemy
-import Polysemy.Input
-import Polysemy.Tagged
-import Polysemy.Methodology
-import Polysemy.Output
+import Techlab
 
 -- | A `DeckConfiguration` indicates how we create cards.
 data DeckConfiguration

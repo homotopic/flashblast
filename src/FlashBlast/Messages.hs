@@ -1,11 +1,10 @@
 module FlashBlast.Messages where
 
-import Formatting
-import RIO
-import RIO.Text
+import Techlab
+import qualified Techlab.Formatting as F
 
-msgBuildingDeck :: Format r' (Text -> r')
-msgBuildingDeck = "Building Deck: " % stext
+msgBuildingDeck :: F.Format r' (Text -> r')
+msgBuildingDeck = "Building Deck: " F.% F.stext
 
-msgDeckComplete :: Format r' (Text -> r')
-msgDeckComplete = "Deck Complete: " % stext
+msgDeckComplete :: F.Format r' (Text -> r')
+msgDeckComplete = "Deck Complete: " F.% F.stext

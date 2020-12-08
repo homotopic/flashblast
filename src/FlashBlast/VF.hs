@@ -11,11 +11,8 @@ module FlashBlast.VF (
 , VFC(..)
 ) where
 
-import Optics
 import Dhall
-import Path
-import Path.Dhall()
-import RIO
+import Techlab
 
 data VF where
   Blank      :: VF

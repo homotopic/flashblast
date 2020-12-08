@@ -3,15 +3,11 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module FlashBlast.Config where
 
-import qualified Dhall                  as D
-import qualified Dhall.Deriving         as D
 import           FlashBlast.ForvoClient
-import FlashBlast.Subtitles
+import           FlashBlast.Subtitles
 import           FlashBlast.VF
-import           Path
-import           Path.Dhall             ()
-import           Optics.TH
-import           RIO
+import           Techlab
+import qualified Techlab.Dhall                  as D
 
 data MultiClozeSpec = MultiClozeSpec {
   _phrases :: [Text]

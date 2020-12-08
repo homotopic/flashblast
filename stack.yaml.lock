@@ -12,6 +12,13 @@ packages:
   original:
     hackage: compact-0.2.0.0
 - completed:
+    hackage: ghc-clippy-plugin-0.0.0.1@sha256:0fa94f5302356b685c23486c4fbe2a1741f1bed470718b7a432b4e21ddb10d9f,1394
+    pantry-tree:
+      size: 316
+      sha256: 426a0b706ef8d44bd63ec1906af08837d358a7d321984ce5b01ad1928a468140
+  original:
+    hackage: ghc-clippy-plugin-0.0.0.1
+- completed:
     hackage: polysemy-plugin-0.2.5.1@sha256:61c6c0aad2852377aa5d5a8f9639a437905e3a6f0e2a99a41e96fb231dc86836,2952
     pantry-tree:
       size: 1232
@@ -75,6 +82,13 @@ packages:
   original:
     hackage: polysemy-zoo-0.7.0.1
 - completed:
+    hackage: co-log-polysemy-0.0.1.2@sha256:a6ea6103f5ca806dc16bcdbb666ee2ebafdbbf36a9626f33103105a41a55d561,3645
+    pantry-tree:
+      size: 400
+      sha256: 56ddcbaf126c9e557d7e1336c6d1a9044567676dcdbc24fab34907d9a5725f73
+  original:
+    hackage: co-log-polysemy-0.0.1.2
+- completed:
     hackage: co-log-polysemy-formatting-0.1.0.0@sha256:4e0564fdb9d373be15d669c135227b214d341a2f7113ff7a9124928b2bf17710,3406
     pantry-tree:
       size: 870
@@ -124,6 +138,13 @@ packages:
   original:
     hackage: polysemy-vinyl-0.1.4.0
 - completed:
+    hackage: techlab-0.1.0.0@sha256:02484eaa1f1a8b519c4351e00542ed51037ec88e7abd2c9ac09fc595613fc132,1098
+    pantry-tree:
+      size: 382
+      sha256: d326cf8219471b5105fa4cd5bed5bb2caac48f4185f9f580f746c9cec48b0936
+  original:
+    hackage: techlab-0.1.0.0
+- completed:
     hackage: formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
     pantry-tree:
       size: 1256
@@ -151,9 +172,16 @@ packages:
       sha256: 1675181a1e6db5ff250b4f4c45c4919c0dd50b1cd69fe5bc3ea3aff20da6b047
   original:
     hackage: polysemy-methodology-composite-0.1.4.0
+- completed:
+    hackage: chassis-0.0.1.0@sha256:e52ca1cc2bd0787e09bae5404be9092cab23d191ce8bb907f48ea5148b003069,1008
+    pantry-tree:
+      size: 260
+      sha256: 2583e90542e527ff3868f28b74332d82a057781acb4b7035713278c8836e9dcc
+  original:
+    hackage: chassis-0.0.1.0
 snapshots:
 - completed:
-    size: 544237
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/11/6.yaml
-    sha256: d8fa9554a98e6d3c1cf05ca6c5b7cfadedc6ad6461df6eb5b8202fafbf102bad
-  original: nightly-2020-11-06
+    size: 556330
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/12/6.yaml
+    sha256: 53a2f3fe06fcac029ccf4fd54b5bb1745dc52451d9f023ef94721839bf991d8e
+  original: nightly-2020-12-06

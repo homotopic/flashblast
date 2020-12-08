@@ -1,9 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module FlashBlast.YouTubeDL where
 
-import Polysemy
-import RIO
-import Path
+import Techlab
 import qualified Turtle as S
 import Path.Utils
 

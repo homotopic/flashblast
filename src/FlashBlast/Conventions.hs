@@ -2,18 +2,17 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 module FlashBlast.Conventions where
 
-import           Composite.Record
 import           Composite.TH
 import           Data.Align
 import           FlashBlast.VF
-import           Formatting
+import qualified Techlab.Formatting as F
 import           Lucid
-import           Path
 import           Path.Utils
-import           RIO
-import           RIO.List.Partial
-import qualified RIO.Text         as T
-import qualified RIO.Text.Lazy    as LT
+import           Data.List
+import qualified Data.Text         as T
+import qualified Data.Text.Lazy    as LT
+import Techlab
+import qualified Control.Lens as L
 
 withLensesAndProxies [d|
   type FFront        = "front" :-> VF
@@ -57,7 +56,7 @@ ungroundedImage :: Path Rel File -> Html ()
 ungroundedImage x = img_ [src_ $ toFilePathText x]
 
 soundEmbed :: Path Rel File -> Text
-soundEmbed = sformat ("[sound:" % stext % "]") . toFilePathText
+soundEmbed = F.sformat ("[sound:" F.% F.stext F.% "]") . toFilePathText
 
 renderExcerptNote :: RExcerptNote -> Text
 renderExcerptNote (a :*: b :*: c :*: RNil) =
@@ -132,17 +131,17 @@ instance HasMedia VFC where
   getMedia (Multi xs) = foldMap getMedia xs
 
 instance HasMedia RBasicNote where
-  getMedia f = getMedia (view fFront f) <> getMedia (view fBack f) <> getMedia (view fFrontExtra f) <> getMedia (view fBackExtra f)
+  getMedia f = getMedia (L.view fFront f) <> getMedia (L.view fBack f) <> getMedia (L.view fFrontExtra f) <> getMedia (L.view fBackExtra f)
 
 instance HasMedia RMinimalNote where
-  getMedia f = getMedia (view fFront f) <> getMedia (view fBack f)
+  getMedia f = getMedia (L.view fFront f) <> getMedia (L.view fBack f)
 
 instance HasMedia RExcerptNote where
-  getMedia f = getMedia (view fExtra f) <> getMedia (view fBack f)
+  getMedia f = getMedia (L.view fExtra f) <> getMedia (L.view fBack f)
 
 instance HasMedia RPronunciationNote where
   getMedia f = mconcat $ getMedia <$>
-                [ view fAudio1 f, view fAudio2 f, view fAudio3 f, view fAudio4 f
-                , view fAudio5 f, view fAudio6 f, view fAudio7 f, view fAudio8 f
-                , view fAudio9 f, view fAudio10 f, view fAudio11 f, view fAudio12 f
-                , view fAudio13 f, view fAudio14 f, view fAudio15 f, view fAudio16 f]
+                [ L.view fAudio1 f, L.view fAudio2 f, L.view fAudio3 f, L.view fAudio4 f
+                , L.view fAudio5 f, L.view fAudio6 f, L.view fAudio7 f, L.view fAudio8 f
+                , L.view fAudio9 f, L.view fAudio10 f, L.view fAudio11 f, L.view fAudio12 f
+                , L.view fAudio13 f, L.view fAudio14 f, L.view fAudio15 f, L.view fAudio16 f]

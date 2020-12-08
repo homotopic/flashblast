@@ -1,37 +1,37 @@
 module FlashBlast.Subtitles where
 
-import Dhall
+import qualified Dhall as D
 import Text.Subtitles.SRT
 import qualified Data.Attoparsec.Text as A
-import RIO
 import Data.Either.Validation
-import qualified RIO.Text as T
+import qualified Data.Text as T
+import Techlab
 import qualified Polysemy.Video as V
 
 newtype SRT = SRT [Line]
   deriving (Eq, Show, Ord)
 
-instance FromDhall SRT where
+instance D.FromDhall SRT where
   autoWith options = srtDecoder options
 
-srtDecoder :: InputNormalizer -> Decoder SRT
+srtDecoder :: D.InputNormalizer -> D.Decoder SRT
 srtDecoder opts =
-      Decoder
+      D.Decoder
             { extract = extractSrt
             , expected = expectedSrt
             }
       where
-        textDecoder :: Decoder Text
-        textDecoder = autoWith opts
+        textDecoder :: D.Decoder Text
+        textDecoder = D.autoWith opts
 
         extractSrt expression =
-          case extract textDecoder expression of
+          case D.extract textDecoder expression of
               Success x -> case A.parseOnly parseSRT x of
-                Left exception   -> Dhall.extractError (T.pack $ show exception)
+                Left exception   -> D.extractError (T.pack $ show exception)
                 Right path       -> Success (SRT path)
               Failure e        -> Failure e
 
-        expectedSrt = expected textDecoder
+        expectedSrt = D.expected textDecoder
 
 fromTime :: Time -> V.Time
 fromTime (Time h m s f) = V.Time h m s f

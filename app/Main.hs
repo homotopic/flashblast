@@ -1,16 +1,12 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-import           Colog.Polysemy
 import           Colog.Polysemy.Formatting
-import           Composite.CoRecord
-import           Composite.Record
-import           Control.Comonad.Env
-import           Control.Monad.Extra hiding (whenM)
-import           Data.Vinyl
-import           Data.Vinyl.Functor
-import           Fcf hiding (Map, Error)
-import           Fcf.Class.Functor hiding (Map)
+import           Data.List
+import           Data.Monoid.Generic
+import qualified Data.Map                                     as Map
+import qualified Data.Text                                    as T
+import qualified Dhall                                       as D
 import           FlashBlast.ClozeParse
 import qualified FlashBlast.Config                           as Config
 import           FlashBlast.Conventions
@@ -20,35 +16,12 @@ import           FlashBlast.Messages
 import           FlashBlast.Subtitles
 import           FlashBlast.VF
 import           FlashBlast.YouTubeDL
-import qualified Formatting as F
-import           Data.Monoid.Generic
-import qualified Dhall                                       as D
-import           Optics
-import           Path
-import           Path.Dhall                                  ()
 import           Path.Utils
-import           Polysemy
-import           Polysemy.Error                              as P
-import           Polysemy.FS
 import           Polysemy.FSKVStore
 import           Polysemy.Http hiding (Path)
-import           Polysemy.Input
-import           Polysemy.KVStore
-import           Polysemy.Methodology
-import           Polysemy.Methodology.Composite
-import           Polysemy.Output
-import           Polysemy.Resource
-import           Polysemy.Tagged
 import           Polysemy.Video                              hiding (to)
-import           Polysemy.Vinyl
-import           RIO                                         hiding (Builder, trace, log, Display,
-                                                              logInfo, over, to,
-                                                              view,
-                                                              writeFileUtf8,
-                                                              (^.))
-import           RIO.List
-import qualified RIO.Map                                     as Map
-import qualified RIO.Text                                    as T
+import           Techlab
+import qualified Techlab.Formatting                           as F
 import qualified Text.Subtitles.SRT                          as SR
 
 interpretVideoSource :: Members '[Input Config.ResourceDirs, YouTubeDL] m
@@ -130,7 +103,7 @@ runMultiClozeSpecIO f y s (Config.MultiClozeSpec p is) = do
     forM p \a -> do
                    let (bs, cs) = genClozePhrase a
                    Config.ResourceDirs {..} <- input
-                   P.catch (
+                   catch (
                      whenJust (liftA2 (,) s y) \(Config.ForvoSpec l, k) ->
                        forM_ cs $ \x -> getForvo l x (_audio </> f x)
                          & runForvoClient
@@ -306,7 +279,7 @@ main = do
       & runFSKVStoreRelBS $(mkRelDir ".")
       & runError @SomeException
       & runError @HttpError
-      & runLogAction (logTextStderr)
+      & runLogAction logTextStderr
       & interpretLogNull
       & resourceToIO
       & runM
