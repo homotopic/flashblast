@@ -72,7 +72,7 @@ showFieldsCSV = recordToList . rmapMethod @RenderVF aux
         aux (Identity x) = Const (renderVF x)
 
 instance RenderVF a => RenderVF (s :-> a) where
-  renderVF x = renderVF . getVal $ x
+  renderVF = renderVF . getVal
 
 instance HasMedia a => HasMedia (s :-> a) where
   getMedia = getMedia . getVal
