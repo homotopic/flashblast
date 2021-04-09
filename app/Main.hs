@@ -193,8 +193,8 @@ writeOutDeck Deck{..} = do
   createDirectory _notes
   forM_ (Map.toList notes) $ \(x, k) ->  writeFileUtf8 (_notes </> x) k
 
-renderDeck :: (RecMapMethod RenderVF Identity xs, RecordToList xs, HasMedia (Record xs)) => Path Rel File -> [Record xs] -> Deck
-renderDeck x as = Deck [(x, renderNotes as)] (getMedia =<< as)
+renderDeck :: (RecMapMethod RenderVF Identity xs, RecordToList xs, RecMapMethod HasMedia Identity xs) => Path Rel File -> [Record xs] -> Deck
+renderDeck x as = Deck [(x, renderNotes as)] (getRecordMedia =<< as)
 
 type CardTypes = ['Minimal, 'Basic, 'Excerpt, 'Pronunciation]
 

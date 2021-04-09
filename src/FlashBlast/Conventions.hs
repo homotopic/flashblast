@@ -74,6 +74,9 @@ showFieldsCSV = recordToList . rmapMethod @RenderVF aux
 instance RenderVF a => RenderVF (s :-> a) where
   renderVF x = renderVF . getVal $ x
 
+instance HasMedia a => HasMedia (s :-> a) where
+  getMedia = getMedia . getVal
+
 class RenderVF a where
   renderVF :: a -> Text
 
@@ -104,6 +107,15 @@ renderNote :: ( RecMapMethod RenderVF Identity ts
            -> Text
 renderNote = T.intercalate "\t" . showFieldsCSV
 
+getRecordMedia :: ( RecMapMethod HasMedia Identity ts
+                  , RecordToList ts)
+               => Record ts
+               -> [Path Rel File]
+getRecordMedia = join . recordToList . rmapMethod @HasMedia aux where
+  aux :: (HasMedia (PayloadType Identity a))
+      => Identity a -> Const [Path Rel File] a
+  aux (Identity x) = Const (getMedia x)
+
 class HasMedia f where
   getMedia :: f -> [Path Rel File]
 
@@ -116,19 +128,3 @@ instance HasMedia VF where
 instance HasMedia VFC where
   getMedia (Single x) = getMedia x
   getMedia (Multi xs) = foldMap getMedia xs
-
-instance HasMedia RBasicNote where
-  getMedia f = getMedia (view fFront f) <> getMedia (view fBack f) <> getMedia (view fFrontExtra f) <> getMedia (view fBackExtra f)
-
-instance HasMedia RMinimalNote where
-  getMedia f = getMedia (view fFront f) <> getMedia (view fBack f)
-
-instance HasMedia RExcerptNote where
-  getMedia f = getMedia (view fExtra f) <> getMedia (view fBack f)
-
-instance HasMedia RPronunciationNote where
-  getMedia f = mconcat $ getMedia <$>
-                [ view fAudio1 f, view fAudio2 f, view fAudio3 f, view fAudio4 f
-                , view fAudio5 f, view fAudio6 f, view fAudio7 f, view fAudio8 f
-                , view fAudio9 f, view fAudio10 f, view fAudio11 f, view fAudio12 f
-                , view fAudio13 f, view fAudio14 f, view fAudio15 f, view fAudio16 f]
