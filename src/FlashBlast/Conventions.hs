@@ -74,18 +74,6 @@ showFieldsCSV = recordToList . rmapMethod @RenderVF aux
 instance RenderVF a => RenderVF (s :-> a) where
   renderVF x = renderVF . getVal $ x
 
-renderExcerptNote :: RExcerptNote -> Text
-renderExcerptNote = T.intercalate "\t" . showFieldsCSV
-
-renderPronunciationNote :: RPronunciationNote -> Text
-renderPronunciationNote = T.intercalate "\t" . showFieldsCSV
-
-renderMinimalNote :: RMinimalNote -> Text
-renderMinimalNote = T.intercalate "\t" . showFieldsCSV
-
-renderBasicReversedNote :: RBasicNote -> Text
-renderBasicReversedNote = T.intercalate "\t" . showFieldsCSV
-
 class RenderVF a where
   renderVF :: a -> Text
 
@@ -110,25 +98,11 @@ genForvos x zs ys' =
        :*: RNil
   in RawText x :*: zs :*: ks
 
-class RenderNote f where
-  renderNote :: f -> Text
-
-data SomeNote = forall e. RenderNote e => SomeNote e
-
-instance RenderNote RBasicNote where
-  renderNote = renderBasicReversedNote
-
-instance RenderNote RMinimalNote where
-  renderNote = renderMinimalNote
-
-instance RenderNote RExcerptNote where
-  renderNote = renderExcerptNote
-
-instance RenderNote RPronunciationNote where
-  renderNote = renderPronunciationNote
-
-instance RenderNote SomeNote where
-  renderNote (SomeNote e) = renderNote e
+renderNote :: ( RecMapMethod RenderVF Identity ts
+              , RecordToList ts)
+           => Record ts
+           -> Text
+renderNote = T.intercalate "\t" . showFieldsCSV
 
 class HasMedia f where
   getMedia :: f -> [Path Rel File]

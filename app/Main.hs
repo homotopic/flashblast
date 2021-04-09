@@ -8,7 +8,7 @@ import           Composite.Record
 import           Control.Comonad.Env
 import           Control.Monad.Extra hiding (whenM)
 import           Data.Vinyl
-import           Data.Vinyl.Functor
+import           Data.Vinyl.Functor hiding (Identity)
 import           Fcf hiding (Map, Error)
 import           Fcf.Class.Functor hiding (Map)
 import           FlashBlast.ClozeParse
@@ -182,7 +182,9 @@ extractParts x = Map.fromList . itoListOf
 
 type FileMap b = Map (Path b File)
 
-renderNotes :: RenderNote a => [a] -> Text
+renderNotes :: ( RecMapMethod RenderVF Identity xs
+               , RecordToList xs)
+            => [Record xs] -> Text
 renderNotes = T.intercalate "\n" . fmap renderNote
 
 writeOutDeck :: Members '[Input Config.ExportDirs, FSDir, FSWrite] r => Deck -> Sem r ()
@@ -191,7 +193,7 @@ writeOutDeck Deck{..} = do
   createDirectory _notes
   forM_ (Map.toList notes) $ \(x, k) ->  writeFileUtf8 (_notes </> x) k
 
-renderDeck :: forall p. (HasMedia p, RenderNote p) => Path Rel File -> [p] -> Deck
+renderDeck :: (RecMapMethod RenderVF Identity xs, RecordToList xs, HasMedia (Record xs)) => Path Rel File -> [Record xs] -> Deck
 renderDeck x as = Deck [(x, renderNotes as)] (getMedia =<< as)
 
 type CardTypes = ['Minimal, 'Basic, 'Excerpt, 'Pronunciation]
