@@ -5,6 +5,34 @@
 
 packages:
 - completed:
+    hackage: Cabal-3.0.2.0@sha256:f45ee078a8529d1ad3993767345ac83304c7f2ff5eec02c455a1dc200ad22c67,26714
+    pantry-tree:
+      size: 40207
+      sha256: 653461a4e58b10a6ef9d6ed5e07b1f8839ed46b4673133ecbe3899a48d6b983b
+  original:
+    hackage: Cabal-3.0.2.0
+- completed:
+    hackage: co-log-0.4.0.1@sha256:3d4c17f37693c80d1aa2c41669bc3438fac3e89dc5f479e57d79bc3ddc4dfcc5,5087
+    pantry-tree:
+      size: 1126
+      sha256: e73165ff8f744709428e2e87984c9d60ca1cec43d8455c413181c7c466e7497c
+  original:
+    hackage: co-log-0.4.0.1
+- completed:
+    hackage: co-log-polysemy-formatting-0.1.1.0@sha256:c207eebac6e2977b63900384ad72f628ba2fc69b560736fef82c5ada481118ed,3412
+    pantry-tree:
+      size: 870
+      sha256: b6de144876292857ba0cd8ef051089127f5973650154c19da43c43c10b0dc8bd
+  original:
+    hackage: co-log-polysemy-formatting-0.1.1.0
+- completed:
+    hackage: co-log-polysemy-0.0.1.2@sha256:a6ea6103f5ca806dc16bcdbb666ee2ebafdbbf36a9626f33103105a41a55d561,3645
+    pantry-tree:
+      size: 400
+      sha256: 56ddcbaf126c9e557d7e1336c6d1a9044567676dcdbc24fab34907d9a5725f73
+  original:
+    hackage: co-log-polysemy-0.0.1.2
+- completed:
     hackage: compact-0.2.0.0@sha256:9c5785bdc178ea6cf8f514ad35a78c64220e3cdb22216534e4cf496765551c7e,2345
     pantry-tree:
       size: 546
@@ -12,19 +40,19 @@ packages:
   original:
     hackage: compact-0.2.0.0
 - completed:
-    hackage: polysemy-plugin-0.2.5.1@sha256:61c6c0aad2852377aa5d5a8f9639a437905e3a6f0e2a99a41e96fb231dc86836,2952
+    hackage: formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
     pantry-tree:
-      size: 1232
-      sha256: 9720d9a1675c7ac3e2635b8c9f002f7ab0764eb60738a3405603cb33bdffc493
+      size: 1256
+      sha256: 608ce19f1eb26de54f59ffb565bf1fa8b9e8a0889919855b887b88542f311edc
   original:
-    hackage: polysemy-plugin-0.2.5.1
+    hackage: formatting-7.1.1
 - completed:
-    hackage: subtitleParser-0.5@sha256:e01dd1cac3434c16d0bdf33a3c6ce1132e76ce69134d24d5f2908a7215c0c30e,1344
+    hackage: ghc-clippy-plugin-0.0.0.1@sha256:0fa94f5302356b685c23486c4fbe2a1741f1bed470718b7a432b4e21ddb10d9f,1394
     pantry-tree:
-      size: 743
-      sha256: 3d0fdac25f09e50bd3e12bbcce475aace2e3fd13f878754cf6fd11e5d29ee4e3
+      size: 316
+      sha256: 426a0b706ef8d44bd63ec1906af08837d358a7d321984ce5b01ad1928a468140
   original:
-    hackage: subtitleParser-0.5
+    hackage: ghc-clippy-plugin-0.0.0.1
 - completed:
     hackage: replace-megaparsec-1.4.3.0@sha256:7fe9c1384093bbb1cfb3db426b3f408c080bdd9955e528d48bcb91de350627cb,2462
     pantry-tree:
@@ -47,61 +75,12 @@ packages:
   original:
     hackage: path-utils-0.1.1.0
 - completed:
-    hackage: unliftio-path-0.0.2.0@sha256:cf4b02640b99831004853e8fc9f9ff922514d08a24ea36e09e8e7a77b250bc80,787
+    hackage: polysemy-1.5.0.0@sha256:7edb723e7f703fe273a40e43fe33f6e8f7659fe60759e8698def1481262d314d,6246
     pantry-tree:
-      size: 281
-      sha256: 96fc899a5d4935c5eb8075e5f65a2c5eb046282ad9aac0fadcb3cbad9bdca164
+      size: 4438
+      sha256: 7b7d379751f79f0e0e5afcdf3d8092e5b8e04515710f21f514aa8f29ce4835f4
   original:
-    hackage: unliftio-path-0.0.2.0
-- completed:
-    hackage: polysemy-video-0.1.2.0@sha256:15df179ec830b40c05153d8468756b3d1e0db5b8a179cd57af1a13b9a4299c05,991
-    pantry-tree:
-      size: 273
-      sha256: b2585aa242c670b3471ecb19c4e66c3c464b56600aa85234519d5994fa0fd295
-  original:
-    hackage: polysemy-video-0.1.2.0
-- completed:
-    hackage: polysemy-http-0.3.0.0@sha256:65d6407181bd5ca8ac85b891c32c707387584bfe7d609f10f1f0327b8ce00aa4,7362
-    pantry-tree:
-      size: 2384
-      sha256: d2d6e63149308ddb4f1cbf13f688837273beda4009aede2d0d7d32c7347f8d21
-  original:
-    hackage: polysemy-http-0.3.0.0
-- completed:
-    hackage: polysemy-zoo-0.7.0.1@sha256:60c2921df95f61d43222a75adde4f330e9510320b416132838a354cd81b4bcc5,3846
-    pantry-tree:
-      size: 2979
-      sha256: af39e295a7831e6bca01fa78df6c538cb6f1dfb339d118056fd0d9c314925726
-  original:
-    hackage: polysemy-zoo-0.7.0.1
-- completed:
-    hackage: co-log-polysemy-formatting-0.1.0.0@sha256:4e0564fdb9d373be15d669c135227b214d341a2f7113ff7a9124928b2bf17710,3406
-    pantry-tree:
-      size: 870
-      sha256: 6ef5d7e40e8885e66111faa23ad59364177c1c6cb9908a302f54b2dea1300c6a
-  original:
-    hackage: co-log-polysemy-formatting-0.1.0.0
-- completed:
-    hackage: polysemy-methodology-0.1.7.0@sha256:07859e4e2ebc7ae430eb2ea1888ddb29bb706341c24544e0dc82e270c9fdadb2,993
-    pantry-tree:
-      size: 287
-      sha256: 8cbb0bdf133f4e3e36f993ec5ab02aa5ed92f0f48fea6027b41b7fd3ae1555fd
-  original:
-    hackage: polysemy-methodology-0.1.7.0
-- completed:
-    hackage: polysemy-fskvstore-0.1.0.0@sha256:c44344eba2b1e7a912c1252501ad351e81cd5f43d0c709c7d11e448f80a486d8,896
-    pantry-tree:
-      size: 327
-      sha256: bf54e5fc44c8c6e387cc0bb29686d591e17c567225ded8a6a3e5730cbb3b65e0
-  original:
-    hackage: polysemy-fskvstore-0.1.0.0
-- completed:
-    hackage: polysemy-path-0.0.1.0@sha256:d985ebbceda2032428656e066ac2caf9c25fd3efb12bc3f7c5164e42494e7675,845
-    pantry-tree:
-      size: 270
-      sha256: be876f1d6a2dc678f97699d994928843d4540294d5a358493bfa02392f200f03
-  original:
-    hackage: polysemy-path-0.0.1.0
+    hackage: polysemy-1.5.0.0
 - completed:
     hackage: polysemy-extra-0.1.5.0@sha256:8fd8aaae68973af0151d66aaf1bb1acae84136868907bfc004b54bae1623b8cf,854
     pantry-tree:
@@ -117,33 +96,26 @@ packages:
   original:
     hackage: polysemy-fs-0.1.0.0
 - completed:
-    hackage: polysemy-vinyl-0.1.4.0@sha256:e56a1a978a9321ceb45fb45af93c49da9c39e940c1e8f38890467b49e0a2c238,1042
+    hackage: polysemy-fskvstore-0.1.0.0@sha256:c44344eba2b1e7a912c1252501ad351e81cd5f43d0c709c7d11e448f80a486d8,896
     pantry-tree:
-      size: 273
-      sha256: 2c51107733c84461c83a6b858c1d47bc72a5d2dc3e8d331b24bd0355e51508f6
+      size: 327
+      sha256: bf54e5fc44c8c6e387cc0bb29686d591e17c567225ded8a6a3e5730cbb3b65e0
   original:
-    hackage: polysemy-vinyl-0.1.4.0
+    hackage: polysemy-fskvstore-0.1.0.0
 - completed:
-    hackage: formatting-7.1.1@sha256:b7fb414905967e9a7c4230d7a36aa85844cc50da54ae4618b6e0f123901cfa79,3185
+    hackage: polysemy-http-0.3.0.0@sha256:65d6407181bd5ca8ac85b891c32c707387584bfe7d609f10f1f0327b8ce00aa4,7362
     pantry-tree:
-      size: 1256
-      sha256: 608ce19f1eb26de54f59ffb565bf1fa8b9e8a0889919855b887b88542f311edc
+      size: 2384
+      sha256: d2d6e63149308ddb4f1cbf13f688837273beda4009aede2d0d7d32c7347f8d21
   original:
-    hackage: formatting-7.1.1
+    hackage: polysemy-http-0.3.0.0
 - completed:
-    hackage: polysemy-1.4.0.0@sha256:0245a046eaf936557d4208b5a355df1a20799c9e274f91fa889ab2644ecbabae,6541
+    hackage: polysemy-methodology-0.1.7.0@sha256:07859e4e2ebc7ae430eb2ea1888ddb29bb706341c24544e0dc82e270c9fdadb2,993
     pantry-tree:
-      size: 4379
-      sha256: babfd86f145bc6017f7b8c20e46266ab3a3bb5d5d415d8cf651036b11e57465a
+      size: 287
+      sha256: 8cbb0bdf133f4e3e36f993ec5ab02aa5ed92f0f48fea6027b41b7fd3ae1555fd
   original:
-    hackage: polysemy-1.4.0.0
-- completed:
-    hackage: Cabal-3.0.2.0@sha256:f45ee078a8529d1ad3993767345ac83304c7f2ff5eec02c455a1dc200ad22c67,26714
-    pantry-tree:
-      size: 40207
-      sha256: 653461a4e58b10a6ef9d6ed5e07b1f8839ed46b4673133ecbe3899a48d6b983b
-  original:
-    hackage: Cabal-3.0.2.0
+    hackage: polysemy-methodology-0.1.7.0
 - completed:
     hackage: polysemy-methodology-composite-0.1.4.0@sha256:f895925000f9050d75f896851cd55f6accfa4a5fafa47013b5edae6a2f87f503,1144
     pantry-tree:
@@ -151,9 +123,69 @@ packages:
       sha256: 1675181a1e6db5ff250b4f4c45c4919c0dd50b1cd69fe5bc3ea3aff20da6b047
   original:
     hackage: polysemy-methodology-composite-0.1.4.0
+- completed:
+    hackage: polysemy-path-0.0.1.0@sha256:d985ebbceda2032428656e066ac2caf9c25fd3efb12bc3f7c5164e42494e7675,845
+    pantry-tree:
+      size: 270
+      sha256: be876f1d6a2dc678f97699d994928843d4540294d5a358493bfa02392f200f03
+  original:
+    hackage: polysemy-path-0.0.1.0
+- completed:
+    hackage: polysemy-plugin-0.2.5.1@sha256:61c6c0aad2852377aa5d5a8f9639a437905e3a6f0e2a99a41e96fb231dc86836,2952
+    pantry-tree:
+      size: 1232
+      sha256: 9720d9a1675c7ac3e2635b8c9f002f7ab0764eb60738a3405603cb33bdffc493
+  original:
+    hackage: polysemy-plugin-0.2.5.1
+- completed:
+    hackage: polysemy-video-0.1.2.0@sha256:15df179ec830b40c05153d8468756b3d1e0db5b8a179cd57af1a13b9a4299c05,991
+    pantry-tree:
+      size: 273
+      sha256: b2585aa242c670b3471ecb19c4e66c3c464b56600aa85234519d5994fa0fd295
+  original:
+    hackage: polysemy-video-0.1.2.0
+- completed:
+    hackage: polysemy-vinyl-0.1.4.0@sha256:e56a1a978a9321ceb45fb45af93c49da9c39e940c1e8f38890467b49e0a2c238,1042
+    pantry-tree:
+      size: 273
+      sha256: 2c51107733c84461c83a6b858c1d47bc72a5d2dc3e8d331b24bd0355e51508f6
+  original:
+    hackage: polysemy-vinyl-0.1.4.0
+- completed:
+    hackage: polysemy-zoo-0.7.0.1@sha256:60c2921df95f61d43222a75adde4f330e9510320b416132838a354cd81b4bcc5,3846
+    pantry-tree:
+      size: 2979
+      sha256: af39e295a7831e6bca01fa78df6c538cb6f1dfb339d118056fd0d9c314925726
+  original:
+    hackage: polysemy-zoo-0.7.0.1
+- completed:
+    hackage: subtitleParser-0.5@sha256:e01dd1cac3434c16d0bdf33a3c6ce1132e76ce69134d24d5f2908a7215c0c30e,1344
+    pantry-tree:
+      size: 743
+      sha256: 3d0fdac25f09e50bd3e12bbcce475aace2e3fd13f878754cf6fd11e5d29ee4e3
+  original:
+    hackage: subtitleParser-0.5
+- completed:
+    name: text-icu
+    version: 0.7.1.0
+    git: https://github.com/RikvanToor/text-icu
+    pantry-tree:
+      size: 2466
+      sha256: 6a52e7cd938193915ae7d2e6618fcf565b3a3bd6977a865bd5876e3d10bfdbf3
+    commit: 5451d335a6fd27ab3be99b1d2328bd89a8ce4a20
+  original:
+    git: https://github.com/RikvanToor/text-icu
+    commit: 5451d335a6fd27ab3be99b1d2328bd89a8ce4a20
+- completed:
+    hackage: unliftio-path-0.0.2.0@sha256:cf4b02640b99831004853e8fc9f9ff922514d08a24ea36e09e8e7a77b250bc80,787
+    pantry-tree:
+      size: 281
+      sha256: 96fc899a5d4935c5eb8075e5f65a2c5eb046282ad9aac0fadcb3cbad9bdca164
+  original:
+    hackage: unliftio-path-0.0.2.0
 snapshots:
 - completed:
-    size: 544237
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/11/6.yaml
-    sha256: d8fa9554a98e6d3c1cf05ca6c5b7cfadedc6ad6461df6eb5b8202fafbf102bad
-  original: nightly-2020-11-06
+    size: 576531
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2021/4/6.yaml
+    sha256: 6ce168aed6ba23cfe148061587ba1c0f24a09d4cad8b1a5a29b21878e33d6ef4
+  original: nightly-2021-04-06
