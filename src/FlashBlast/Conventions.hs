@@ -10,10 +10,13 @@ import           Formatting
 import           Lucid
 import           Path
 import           Path.Utils
-import           RIO
+import           RIO hiding (Const)
 import           RIO.List.Partial
 import qualified RIO.Text         as T
 import qualified RIO.Text.Lazy    as LT
+import Data.Vinyl.Functor hiding (Identity)
+import Data.Vinyl
+import Data.Vinyl.Class.Method
 
 withLensesAndProxies [d|
   type FFront        = "front" :-> VF
@@ -59,20 +62,29 @@ ungroundedImage x = img_ [src_ $ toFilePathText x]
 soundEmbed :: Path Rel File -> Text
 soundEmbed = sformat ("[sound:" % stext % "]") . toFilePathText
 
+showFieldsCSV :: ( RecMapMethod RenderVF Identity ts
+                 , RecordToList ts)
+              => Record ts
+              -> [Text]
+showFieldsCSV = recordToList . rmapMethod @RenderVF aux
+  where aux :: (RenderVF (PayloadType Identity a))
+            => Identity a -> Const Text a
+        aux (Identity x) = Const (renderVF x)
+
+instance RenderVF a => RenderVF (s :-> a) where
+  renderVF x = renderVF . getVal $ x
+
 renderExcerptNote :: RExcerptNote -> Text
-renderExcerptNote (a :*: b :*: c :*: RNil) =
-  T.intercalate "\t" [renderVF a, renderVF b, renderVF c]
+renderExcerptNote = T.intercalate "\t" . showFieldsCSV
 
 renderPronunciationNote :: RPronunciationNote -> Text
-renderPronunciationNote (a :*: b :*: c :*: d :*: e :*: f :*: g :*: h :*: i :*: j :*: k :*: l :*: m :*: n :*: o :*: p :*: q :*: r :*: RNil)
-  = T.intercalate "\t" $ [renderVF a, renderVF b] ++ (renderVF <$> [c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r])
+renderPronunciationNote = T.intercalate "\t" . showFieldsCSV
 
 renderMinimalNote :: RMinimalNote -> Text
-renderMinimalNote (a :*: b :*: RNil) = T.intercalate "\t" $ renderVF <$> [a, b]
+renderMinimalNote = T.intercalate "\t" . showFieldsCSV
 
 renderBasicReversedNote :: RBasicNote -> Text
-renderBasicReversedNote (a :*: b :*: c :*: d :*: RNil)
-  = T.intercalate "\t" [renderVF a,renderVF b,renderVF c,renderVF d]
+renderBasicReversedNote = T.intercalate "\t" . showFieldsCSV
 
 class RenderVF a where
   renderVF :: a -> Text
