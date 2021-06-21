@@ -1,5 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 import           Colog.Polysemy
 import           Colog.Polysemy.Formatting
@@ -50,6 +51,7 @@ import           RIO.List
 import qualified RIO.Map                                     as Map
 import qualified RIO.Text                                    as T
 import qualified Text.Subtitles.SRT                          as SR
+import Data.Kind
 
 interpretVideoSource :: Members '[Input Config.ResourceDirs, YouTubeDL] m
                      => Config.VideoSource
@@ -100,6 +102,47 @@ runExcerptSpecIO Config.ExcerptSpec {..} = do
           :& val @"extra" (Multi [Image f])
           :& val @"back"  (Audio e)
           :& RNil
+
+data Meth :: Type -> Type -> Type where
+  MkMeth :: Meth a b
+
+data Cut :: Meth a c -> Type -> Exp (Meth a b, Meth b c)
+
+type family ToM (x :: Exp (Meth a b)) (r :: EffectRow) :: Constraint
+
+data (>>=) :: Exp a -> (a -> Exp b) -> Exp b 
+
+type A = MkMeth :: Meth Int String
+
+type X = (Cut A Bool >>= Fst) :: Exp (Meth Int Bool)
+
+type family ToMethodology a (r :: EffectRow) :: Constraint
+
+type instance ToMethodology (Meth a b) r = Member (Methodology a b) r
+
+type instance ToM (X :: Exp (Meth Int Bool)) r = Member (Methodology Int Bool) r
+
+data FreeCategory :: Type -> Type -> Type
+
+data ID :: FreeCategory x x -> Type
+
+data Comp :: FreeCategory x y -> FreeCategory y z -> FreeCategory x z -> Type
+
+{--
+type Op x y = CoRec Identity '[ID, Comp]
+data FreeCategory = IDA | CompA
+type T = CoRec FCK '[IDA, CompA]
+--}
+
+data FCK :: FreeCategory a b -> Type where
+
+{--
+data FreeCategory x y where
+  ID :: FreeCategory x x
+  Comp :: FreeCategory x y -> FreeCategory y z -> FreeCategory x z
+--}
+data FreeGADT :: Type -> Type where
+  GCSTR :: Composite.Record.RElem a x => a -> FreeGADT (Record x)
 
 downloadMP3For :: Members '[ForvoClient] r => Locale -> Text -> Sem r (Maybe ByteString)
 downloadMP3For l t = do
