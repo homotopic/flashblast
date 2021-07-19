@@ -82,7 +82,7 @@ library
       TypeOperators
       TypeSynonymInstances
       ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fplugin=Clippy
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin
   build-depends:
       aeson
     , attoparsec
@@ -97,7 +97,6 @@ library
     , first-class-families
     , formatting
     , generic-monoid
-    , ghc-clippy-plugin
     , http-conduit
     , lucid
     , megaparsec
@@ -111,21 +110,22 @@ library
     , polysemy-fs
     , polysemy-fskvstore
     , polysemy-http
+    , polysemy-kvstore
+    , polysemy-log
     , polysemy-methodology >=0.1.6.0
     , polysemy-methodology-composite >=0.1.2.0
     , polysemy-plugin
     , polysemy-video >=0.1.1.0
     , polysemy-vinyl >=0.1.2.0
-    , polysemy-zoo
     , relude
     , replace-megaparsec
     , rio
     , semialign
-    , subtitleParser
-    , temporary
+    , simple-media-timestamp
+    , srt
+    , srt-attoparsec
     , text
     , these
-    , turtle
     , unliftio-path
     , vinyl
   default-language: Haskell2010
@@ -181,7 +181,7 @@ executable flashblast
       TypeOperators
       TypeSynonymInstances
       ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fplugin=Clippy -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , attoparsec
@@ -197,7 +197,6 @@ executable flashblast
     , flashblast
     , formatting
     , generic-monoid
-    , ghc-clippy-plugin
     , http-conduit
     , lucid
     , megaparsec
@@ -211,21 +210,22 @@ executable flashblast
     , polysemy-fs
     , polysemy-fskvstore
     , polysemy-http
+    , polysemy-kvstore
+    , polysemy-log
     , polysemy-methodology >=0.1.6.0
     , polysemy-methodology-composite >=0.1.2.0
     , polysemy-plugin
     , polysemy-video >=0.1.1.0
     , polysemy-vinyl >=0.1.2.0
-    , polysemy-zoo
     , relude
     , replace-megaparsec
     , rio
     , semialign
-    , subtitleParser
-    , temporary
+    , simple-media-timestamp
+    , srt
+    , srt-attoparsec
     , text
     , these
-    , turtle
     , unliftio-path
     , vinyl
   default-language: Haskell2010

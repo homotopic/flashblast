@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 module FlashBlast.Conventions where
@@ -21,47 +22,47 @@ import qualified RIO.Text.Lazy as LT
 
 withLensesAndProxies
   [d|
-    type FFront = "front" :-> VF
+    type FFront = "front" :-> VFRF
 
-    type FExtra = "extra" :-> VFC
+    type FExtra = "extra" :-> VFCRF
 
-    type FBack = "back" :-> VF
+    type FBack = "back" :-> VFRF
 
-    type FFrontExtra = "front-extra" :-> VFC
+    type FFrontExtra = "front-extra" :-> VFCRF
 
-    type FBackExtra = "back-extra" :-> VFC
+    type FBackExtra = "back-extra" :-> VFCRF
 
-    type FAudio1 = "audio1" :-> VF
+    type FAudio1 = "audio1" :-> VFRF
 
-    type FAudio2 = "audio2" :-> VF
+    type FAudio2 = "audio2" :-> VFRF
 
-    type FAudio3 = "audio3" :-> VF
+    type FAudio3 = "audio3" :-> VFRF
 
-    type FAudio4 = "audio4" :-> VF
+    type FAudio4 = "audio4" :-> VFRF
 
-    type FAudio5 = "audio5" :-> VF
+    type FAudio5 = "audio5" :-> VFRF
 
-    type FAudio6 = "audio6" :-> VF
+    type FAudio6 = "audio6" :-> VFRF
 
-    type FAudio7 = "audio7" :-> VF
+    type FAudio7 = "audio7" :-> VFRF
 
-    type FAudio8 = "audio8" :-> VF
+    type FAudio8 = "audio8" :-> VFRF
 
-    type FAudio9 = "audio9" :-> VF
+    type FAudio9 = "audio9" :-> VFRF
 
-    type FAudio10 = "audio10" :-> VF
+    type FAudio10 = "audio10" :-> VFRF
 
-    type FAudio11 = "audio11" :-> VF
+    type FAudio11 = "audio11" :-> VFRF
 
-    type FAudio12 = "audio12" :-> VF
+    type FAudio12 = "audio12" :-> VFRF
 
-    type FAudio13 = "audio13" :-> VF
+    type FAudio13 = "audio13" :-> VFRF
 
-    type FAudio14 = "audio14" :-> VF
+    type FAudio14 = "audio14" :-> VFRF
 
-    type FAudio15 = "audio15" :-> VF
+    type FAudio15 = "audio15" :-> VFRF
 
-    type FAudio16 = "audio16" :-> VF
+    type FAudio16 = "audio16" :-> VFRF
     |]
 
 type RBasicNote = Record (FFront : FFrontExtra : FBack : FBackExtra : '[])
@@ -116,24 +117,24 @@ showFieldsCSV = recordToList . rmapMethod @RenderVF aux
 instance RenderVF a => RenderVF (s :-> a) where
   renderVF = renderVF . getVal
 
-instance HasMedia a => HasMedia (s :-> a) where
+instance HasMedia x f => HasMedia x (s :-> f) where
   getMedia = getMedia . getVal
 
 class RenderVF a where
   renderVF :: a -> Text
 
-instance RenderVF VF where
+instance RenderVF VFRF where
   renderVF Blank = ""
   renderVF (RawText x) = x
   renderVF (Image x) = LT.toStrict . renderText . ungroundedImage $ x
   renderVF (Audio x) = soundEmbed x
   renderVF (Video x) = undefined
 
-instance RenderVF VFC where
+instance RenderVF VFCRF where
   renderVF (Single x) = renderVF x
   renderVF (Multi xs) = mconcat $ fmap renderVF xs
 
-genForvos :: Text -> VFC -> [VF] -> RPronunciationNote
+genForvos :: Text -> VFCRF -> [VFRF] -> RPronunciationNote
 genForvos x zs ys' =
   let ys = lpadZipWith (const . fromMaybe Blank) ys' (replicate 16 ())
       ks =
@@ -162,28 +163,29 @@ renderNote ::
 renderNote = T.intercalate "\t" . showFieldsCSV
 
 getRecordMedia ::
-  ( RecMapMethod HasMedia Identity ts,
+  forall x ts.
+  ( RecMapMethod (HasMedia x) Identity ts,
     RecordToList ts
   ) =>
   Record ts ->
-  [Path Rel File]
-getRecordMedia = join . recordToList . rmapMethod @HasMedia aux
+  [x]
+getRecordMedia = join . recordToList . rmapMethod @(HasMedia x) aux
   where
     aux ::
-      (HasMedia (PayloadType Identity a)) =>
+      (HasMedia x (PayloadType Identity a)) =>
       Identity a ->
-      Const [Path Rel File] a
+      Const [x] a
     aux (Identity x) = Const (getMedia x)
 
-class HasMedia f where
-  getMedia :: f -> [Path Rel File]
+class HasMedia x f | f -> x where
+  getMedia :: f -> [x]
 
-instance HasMedia VF where
+instance HasMedia x (VF x) where
   getMedia (Image x) = [x]
   getMedia (Audio x) = [x]
   getMedia (Video x) = [x]
   getMedia _ = []
 
-instance HasMedia VFC where
+instance HasMedia x (VFC x) where
   getMedia (Single x) = getMedia x
   getMedia (Multi xs) = foldMap getMedia xs
