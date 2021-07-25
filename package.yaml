@@ -63,6 +63,7 @@ dependencies:
 - base >= 4.7 && < 5
 - co-log-polysemy
 - co-log-polysemy-formatting
+- core-text
 - comonad
 - composite-base
 - dhall
@@ -86,9 +87,10 @@ dependencies:
 - polysemy-http
 - polysemy-log
 - polysemy-methodology >= 0.1.6.0
+- polysemy-methodology-co-log >= 0.1.0.0 && < 0.2
 - polysemy-methodology-composite >= 0.1.2.0
 - polysemy-plugin
-- polysemy-video >= 0.1.1.0
+- polysemy-video >= 0.2.0.0
 - polysemy-vinyl >= 0.1.2.0
 - relude
 - rio
@@ -98,9 +100,13 @@ dependencies:
 - simple-media-timestamp
 - srt
 - srt-attoparsec
+- srt-dhall
+- srt-formatting
 - text
 - these
+- turtle
 - unliftio-path
+- variable-media-field >= 0.1.0.0
 - vinyl
 
 library:

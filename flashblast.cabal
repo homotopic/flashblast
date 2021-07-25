@@ -30,7 +30,6 @@ library
       FlashBlast.Domain
       FlashBlast.ForvoClient
       FlashBlast.Messages
-      FlashBlast.Subtitles
       FlashBlast.VF
       FlashBlast.YouTubeDL
   other-modules:
@@ -91,6 +90,7 @@ library
     , co-log-polysemy-formatting
     , comonad
     , composite-base
+    , core-text
     , dhall
     , either
     , extra
@@ -113,9 +113,10 @@ library
     , polysemy-kvstore
     , polysemy-log
     , polysemy-methodology >=0.1.6.0
+    , polysemy-methodology-co-log >=0.1.0.0 && <0.2
     , polysemy-methodology-composite >=0.1.2.0
     , polysemy-plugin
-    , polysemy-video >=0.1.1.0
+    , polysemy-video >=0.2.0.0
     , polysemy-vinyl >=0.1.2.0
     , relude
     , replace-megaparsec
@@ -124,9 +125,13 @@ library
     , simple-media-timestamp
     , srt
     , srt-attoparsec
+    , srt-dhall
+    , srt-formatting
     , text
     , these
+    , turtle
     , unliftio-path
+    , variable-media-field >=0.1.0.0
     , vinyl
   default-language: Haskell2010
 
@@ -190,6 +195,7 @@ executable flashblast
     , co-log-polysemy-formatting
     , comonad
     , composite-base
+    , core-text
     , dhall
     , either
     , extra
@@ -213,9 +219,10 @@ executable flashblast
     , polysemy-kvstore
     , polysemy-log
     , polysemy-methodology >=0.1.6.0
+    , polysemy-methodology-co-log >=0.1.0.0 && <0.2
     , polysemy-methodology-composite >=0.1.2.0
     , polysemy-plugin
-    , polysemy-video >=0.1.1.0
+    , polysemy-video >=0.2.0.0
     , polysemy-vinyl >=0.1.2.0
     , relude
     , replace-megaparsec
@@ -224,8 +231,12 @@ executable flashblast
     , simple-media-timestamp
     , srt
     , srt-attoparsec
+    , srt-dhall
+    , srt-formatting
     , text
     , these
+    , turtle
     , unliftio-path
+    , variable-media-field >=0.1.0.0
     , vinyl
   default-language: Haskell2010

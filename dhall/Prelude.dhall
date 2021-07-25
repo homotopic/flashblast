@@ -1,6 +1,6 @@
 let VF = < Blank | RawText : Text | Image : Text | Audio : Text | Video : Text >
 
-let VFC = < Single : VF | Multi : List VF >
+let VFC = List VF
 
 let MultiClozeSpec = { phrases : List Text, images : List Text }
 

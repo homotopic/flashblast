@@ -13,6 +13,7 @@ import Data.Vinyl.Functor hiding (Identity)
 import FlashBlast.VF
 import Formatting
 import Lucid
+import Media.VF
 import Path
 import Path.Utils
 import RIO hiding (Const)
@@ -131,8 +132,7 @@ instance RenderVF VFRF where
   renderVF (Video x) = undefined
 
 instance RenderVF VFCRF where
-  renderVF (Single x) = renderVF x
-  renderVF (Multi xs) = mconcat $ fmap renderVF xs
+  renderVF (VFC xs) = mconcat $ fmap renderVF xs
 
 genForvos :: Text -> VFCRF -> [VFRF] -> RPronunciationNote
 genForvos x zs ys' =
@@ -187,5 +187,4 @@ instance HasMedia x (VF x) where
   getMedia _ = []
 
 instance HasMedia x (VFC x) where
-  getMedia (Single x) = getMedia x
-  getMedia (Multi xs) = foldMap getMedia xs
+  getMedia (VFC xs) = foldMap getMedia xs

@@ -39,6 +39,7 @@ import Polysemy.Input
 import Polysemy.KVStore
 import Polysemy.Log
 import Polysemy.Methodology
+import Polysemy.Methodology.Colog
 import Polysemy.Methodology.Composite
 import Polysemy.Output
 import Polysemy.Resource
@@ -113,7 +114,7 @@ runExcerptSpecIO Config.ExcerptSpec {..} = do
       extractFrames (_clips </> c) [(Time 0 0 0 0, _images </> f)]
     return $
       val @"front" (RawText (fst . genClozePhrase . dialog $ l))
-        :& val @"extra" (Multi [Image f])
+        :& val @"extra" (VFC [Image f])
         :& val @"back" (Audio e)
         :& RNil
 
@@ -208,7 +209,7 @@ runMultiClozeSpecIO f y s (Config.MultiClozeSpec p is) = do
               & runInputConst @ForvoAPIKey k
       )
       (\(_ :: SomeException) -> return ())
-    return $ genForvos bs (Multi $ map Image is) (map (Audio . f) cs)
+    return $ genForvos bs (VFC $ map Image is) (map (Audio . f) cs)
 
 runPronunciationSpecIO ::
   Members

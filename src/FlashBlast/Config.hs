@@ -7,9 +7,9 @@ module FlashBlast.Config where
 import qualified Dhall as D
 import qualified Dhall.Deriving as D
 import FlashBlast.ForvoClient
-import FlashBlast.Subtitles
 import FlashBlast.VF
 import Media.Subtitles.SRT
+import Media.Subtitles.SRT.Dhall ()
 import Optics.TH
 import Path
 import Path.Dhall ()
