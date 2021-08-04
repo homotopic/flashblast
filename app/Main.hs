@@ -397,7 +397,7 @@ main = do
       & interpretHttpNative
       & runError @SomeException
       & runError @HttpError
-      & runLogAction (logTextStderr)
+      & runLogAction logTextStderr
       & interpretLogNull
       & resourceToIO
       & runM

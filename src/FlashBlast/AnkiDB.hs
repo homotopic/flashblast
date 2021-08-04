@@ -1,5 +1,5 @@
 {-# LANGUAGE PolyKinds       #-}
-{-# LANGUAGE TemplateHaskell #-}
+
 module FlashBlast.AnkiDB where
 
 import           Path

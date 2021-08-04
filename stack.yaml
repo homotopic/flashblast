@@ -1,4 +1,4 @@
-resolver: nightly-2021-07-23
+resolver: nightly-2021-08-03
 packages:
 - .
 extra-deps:
@@ -9,24 +9,16 @@ extra-deps:
 - co-log-polysemy-0.0.1.2
 - co-log-core-0.2.1.1
 - git: https://github.com/locallycompact/composite
-  commit: 5644183439960e63d06ef8ec5e85c25356c6b1fc
+  commit: 7fa2ed8244f6d6c05081c8384338bb3ebffe03c3
   subdirs:
   - composite-base
 - polysemy-conc-0.1.0.3
 - polysemy-http-0.4.0.6
 - polysemy-log-0.2.2.2
-- polysemy-methodology-0.2.0.0
 - polysemy-methodology-co-log-0.1.0.0
 - polysemy-methodology-composite-0.1.4.0
-- polysemy-path-0.2.1.0
 - polysemy-time-0.1.3.1
-- polysemy-several-0.1.0.0
-- polysemy-video-0.2.0.1
-- simple-media-timestamp-formatting-0.1.1.0
-- srt-formatting-0.1.0.0
 - typerep-map-0.3.3.0
-- variable-media-field-0.1.0.0
-- srt-dhall-0.1.0.0
 allow-newer: true
 nix:
   packages: [zlib, libffi, ffmpeg, pkg-config, icu]

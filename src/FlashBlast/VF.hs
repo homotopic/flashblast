@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+
 
 -- |
 --   Module     : FlashBlast.VF
